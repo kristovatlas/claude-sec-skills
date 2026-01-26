@@ -22,3 +22,5 @@ chmod +x update.sh
 ```
 
 ## Available Skills
+
+git commit -m "Test commit signature"

@@ -10,7 +10,7 @@ echo "🔄 Updating personal skills..."
 
 # Pull latest changes
 cd "$REPO_DIR"
-git pull origin main
+git pull origin master
 
 # Run installation
 ./install.sh
