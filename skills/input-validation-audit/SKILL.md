@@ -1,5 +1,5 @@
 ---
-name: security-audit
+name: input-validation-audit
 description: Comprehensive security audit for web applications focusing on input validation, sanitization, and encoding vulnerabilities. Use this skill when analyzing codebases for security vulnerabilities including XSS, SQL injection, command injection, path traversal, and other input-related attacks. Triggers include requests to "audit security", "find vulnerabilities", "check for XSS", "review input validation", "security analysis", or similar security assessment tasks on web applications.
 ---
 
