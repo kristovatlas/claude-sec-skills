@@ -1,5 +1,5 @@
 ---
-name: code-security
+name: semgrep-code-security
 description: Security guidelines for writing secure code. Use when writing code, reviewing code for vulnerabilities, or asking about secure coding practices like "check for SQL injection" or "review security".
 ---
 
