@@ -25,3 +25,4 @@ chmod +x update.sh
 
 * anti-patterns-breadth: From
 * auth-implementation-patterns
+* threat-model: Generate or refresh a STRIDE/LINDDUN threat model for a codebase — assets (incl. intangible/privacy), trust boundaries, threat actors, threats, countermeasures, an ARI risk grade, and a prioritized remediation backlog.
