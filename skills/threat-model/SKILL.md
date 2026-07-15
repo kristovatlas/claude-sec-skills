@@ -11,6 +11,7 @@ Version: 7
 When changes are made to this document by an agent, please bump the version number.
 
 **Notable changes since v6:**
+- **Readability overhaul: analyze as an engineer, write for humans.** The security-engineer persona now governs analysis only — the document itself is written as a briefing for a mixed audience. A new "Write for Human Readers" section requires plain language throughout and **scant code references**: never line numbers, avoid file paths and function names (they mean nothing to most readers and go stale on trivially unrelated refactors — a rename breaks the reference without changing the threat model). The system is referred to by durable names (components, interfaces, roles, configuration surface); acronyms and tools are glossed on first use; concepts are named in prose rather than by code identifiers; precise code locations belong in the working notes, not the model. Enforced by a new validation item.
 - **ARI upgraded to the external ARI specification v1.1** (canonical source: https://github.com/kristovatlas/ari — check it for the latest version before generating or refreshing a model). v1.1 replaces the additive formula embedded in skill v3–v6 (retroactively "ARI v1.0") with a normalized **0–100 index, lower is safer** (`ARI = 100 × Risk Mass / Risk Capacity`), multiplicative defense-in-depth with a 0.03 floor, a 🚫 **Eliminated** control status, optional justified per-control effectiveness levels, grade bands capped by High-severity gates, and a `Δ_scope / Δ_controls` delta decomposition on refreshes. **v1.0 and v1.1 scores are not comparable** — models scored under v1.0 must be rebased on their next refresh (see Handling Existing Threat Models and Incremental Update Workflow, Step 7).
 
 **Notable changes since v5:**
@@ -48,7 +49,25 @@ When producing or refreshing a threat model, adopt the perspective of a senior s
 - Calibrates ratings conservatively. A "Critical" rating means something specific (see Calibration Anchors below) and should not be used as a synonym for "important."
 - Treats ambiguity honestly. When a control's status can't be verified from the code alone, the model says so; it does not guess.
 
-Match the tone to the audience. Engineers reading this should be able to act on it. Avoid filler, generic platitudes, and threats that aren't grounded in something you actually observed.
+This persona governs the **analysis** — what to examine, how skeptically, and how to calibrate. It does not govern the **writing**. The document itself is a briefing for a mixed audience of engineers, product owners, executives, and auditors, most of whom have never opened the codebase (see Write for Human Readers, below). Avoid filler, generic platitudes, and threats that aren't grounded in something you actually observed.
+
+## Write for Human Readers
+
+Adopt the security-engineer persona to analyze; do not let it write. Nobody reading a threat model opens the codebase mid-sentence to decode a reference. Apply these rules to everything in the generated document:
+
+1. **Plain language throughout.** Describe every asset, threat, and countermeasure in terms of what the system does and what could go wrong for whom. A reader with no codebase familiarity must be able to understand every sentence unaided.
+2. **Scant code references — a threat model is not an audit report.** The model describes the *system* (components, roles, data flows, behaviors), not the code's coordinates.
+   - **Never cite line numbers. Avoid file paths and function/class names.** They mean nothing to most readers, and they go stale trivially — a rename or refactor breaks the reference without changing the threat model at all.
+   - Refer to the system by **durable, human-meaningful names**: components and services ("the webhook handler," "the billing worker"), interfaces (API routes, CLI commands), user roles, configuration surface (environment variables, config keys), and named third-party services or packages. These survive refactors and carry meaning on their own.
+   - Grounding is unchanged: every claim must still derive from code you actually read (see Prerequisites), and the Codebase Snapshot anchors what the claims were true against. When a precise code location would genuinely help the next maintainer, record it in the working-notes file — not in the model.
+3. **Gloss acronyms and tools on first use.** Assume no prior knowledge of niche libraries, vendor names, or security acronyms; give a short parenthetical gloss the first time — "CSP (Content-Security-Policy, a browser mechanism restricting where scripts can load from)" — then use the short form. Rule of thumb: gloss anything a competent product manager wouldn't recognize.
+4. **Name concepts in prose, not in code.** When a concept exists in code as an enum value, table, or type, give it a plain-language name — "the Administrator and Support-Staff user roles," "saved payment methods" — rather than reproducing the identifier. If disambiguation truly requires the identifier, it may follow in parentheses, once.
+5. **The no-lookup test.** Read each subsection imagining you cannot open the codebase. If understanding any sentence would require doing so, rewrite the sentence.
+
+Example (invented):
+
+- Poor: "`session_mint()` in `auth/tokens.py:141` lacks a nonce check, so `SessionToken` rows are replayable."
+- Better: "Login tokens can be replayed: a captured token can be reused to impersonate its owner, because the login service does not bind tokens to a one-time value."
 
 ## Prerequisites
 
@@ -135,6 +154,8 @@ If the existing model's ARI was computed under spec v1.0 (any model generated by
 For large or complex models, maintain a sibling working-notes file (e.g., `docs/threat-model-notes.md`) where you can capture meeting notes, raw observations, research findings, and pending questions before they are synthesized into the formal threat model. This separation lets you preserve the user's voice and intermediate context without polluting the formal doc.
 
 The working-notes file is not a deliverable — it's a scratchpad. The formal `THREAT_MODEL.md` synthesizes from it. When asked to update the threat model, check the working notes first.
+
+The working notes are also the home for **precise code locations** (file paths, function names, line references) gathered during analysis. The formal model refers to the system in durable, human-meaningful terms (see Write for Human Readers); the breadcrumbs that let the next refresher re-find the exact code belong here.
 
 ## Risk Index and Grading
 
@@ -398,7 +419,7 @@ If no proposed changes are known, write "No proposed changes are currently under
 
 ## (A1) [Asset Title]
 
-[2-4 sentences describing what this asset is, why an attacker would target it, and any special considerations (e.g., data sensitivity, blast radius of compromise). End with the value rating and a one-sentence justification. Intangible assets follow the same format — describe the harm their loss causes.]
+[2-4 sentences, in plain language per Write for Human Readers, describing what this asset is, why an attacker would target it, and any special considerations (e.g., data sensitivity, blast radius of compromise). Name the asset in domain terms, not by its code identifier. End with the value rating and a one-sentence justification. Intangible assets follow the same format — describe the harm their loss causes.]
 
 As [justification], the value is rated **[Value]**.
 
@@ -423,7 +444,7 @@ Severity matrix:
 
 ## (T1) [Threat Title]
 
-[2-4 sentences explaining the attack vector, how it would be carried out against THIS specific application, and what the attacker gains. Reference specific code patterns, endpoints, or configurations you observed. If this threat is introduced by proposed changes, mark it with "(New)".]
+[2-4 sentences, in plain language per Write for Human Readers, explaining the attack vector, how it would be carried out against THIS specific application, and what the attacker gains. Ground it in the concrete behavior, interface, or configuration you observed — described in system terms (no file paths, function names, or line numbers). If this threat is introduced by proposed changes, mark it with "(New)".]
 
 Crosses: (TB1) [Boundary name]
 Actor(s): (TA1) [Actor name]
@@ -447,8 +468,8 @@ Assets Impacted:
 | ... | ... | ... | ... |
 
 Status values (these are the ARI effectiveness anchors — see the skill's Risk Index section):
-- **🚫 Eliminated**: The attack surface or asset was designed out entirely — removed, not guarded (deleted key, dropped endpoint, cut data field). Cite the removal. This is the only status that zeroes a threat's coverage gap; reserve it for genuine removal, never for a strong mitigation.
-- **✅ Applied**: Evidence found in the codebase. Cite the relevant file(s) or configuration in the subsection.
+- **🚫 Eliminated**: The attack surface or asset was designed out entirely — removed, not guarded (deleted key, dropped endpoint, cut data field). Describe what was removed. This is the only status that zeroes a threat's coverage gap; reserve it for genuine removal, never for a strong mitigation.
+- **✅ Applied**: Evidence found in the codebase. Describe the evidence in system terms in the subsection — which component enforces it and what behavior you verified.
 - **⬜ Not Applied**: No evidence found. The subsection should include implementation guidance.
 - **⚠️ Partial**: Some aspects are implemented but gaps remain. The subsection should describe what's in place and what's missing.
 
@@ -456,7 +477,7 @@ Status values (these are the ARI effectiveness anchors — see the skill's Risk 
 
 **Status**: [🚫 Eliminated / ✅ Applied / ⬜ Not Applied / ⚠️ Partial][ · e = [X]% — [one-line justification; only when overriding the status's default effectiveness, per the skill's justified-effectiveness rules. A custom value with no rationale is invalid.]]
 
-[If Applied: 1-2 sentences citing where in the codebase this is implemented.]
+[If Applied: 1-2 sentences describing the evidence — which component enforces this and what behavior you verified. System terms per Write for Human Readers; no file paths or line numbers.]
 
 [If Not Applied or Partial: 2-5 sentences describing what should be done, why it mitigates the listed threats, and implementation guidance specific to this codebase. Be concrete and actionable.]
 
@@ -590,7 +611,7 @@ Examples of assets include: database records, source code, non-financial PII (em
 ### Threat Actors
 
 - Derive actors from the boundaries: for each boundary, who sits on the untrusted side, and what can they do? That yields the actor list without inventing movie-villain personas.
-- State capability concretely (e.g., "can land a PR into `src/data/content/**`", "controls the origin serving the base URL", "can edit `mcp.json` in a shared devcontainer"), not vaguely ("a hacker").
+- State capability concretely (e.g., "can get a pull request merged into the site's content directory", "controls the server behind the configured content URL", "can edit the tool-configuration file in a shared development container"), not vaguely ("a hacker").
 - An actor with no capability against any boundary does not belong in the model. Each actor must drive ≥1 threat, and its capability should justify the Likelihood of the threats it drives.
 
 ### Threats
@@ -607,7 +628,7 @@ Examples of assets include: database records, source code, non-financial PII (em
 ### Countermeasures
 
 - **Every threat must have at least one countermeasure.** Most countermeasures mitigate multiple threats.
-- Be specific and actionable. Reference actual files, functions, libraries, or configurations in the codebase.
+- Be specific and actionable — but in system terms: name the component, behavior, library, or configuration involved, so a reader can follow it without opening the codebase (see Write for Human Readers).
 - Include both preventive (stop the attack) and detective (notice the attack) countermeasures where appropriate.
 - Suggest specific tools or libraries where relevant (e.g., `socket.dev` for dependency scanning, `helmet` for Express headers, OpenZeppelin `TimelockController` for on-chain admin throttling).
 - For privacy threats, countermeasures are often procedural or documentary (a retention policy, a lawful-basis record, a DPIA, a privacy notice, a deletion job) as much as technical. They are tracked and scored exactly like technical countermeasures and appear in the backlog.
@@ -676,6 +697,7 @@ Adapt the threat model to the domain of the system being analyzed. Consult the r
 ### General Quality Standards
 
 - **No generic filler.** Every sentence should convey information specific to the application being analyzed.
+- **Write for human readers.** Plain language; scant code references (never line numbers; avoid file paths and function names); acronyms and tools glossed on first use; concepts named in prose, not by code identifiers. See Write for Human Readers.
 - **Cross-reference consistently.** Asset IDs (A1, A2...), Trust Boundary IDs (TB1, TB2...), Threat Actor IDs (TA1, TA2...), Threat IDs (T1, T2...), and Countermeasure IDs (C1, C2...) must be used consistently across all tables and subsections. Every STRIDE/LINDDUN bullet carries a disposition tag.
 - **Justify ratings.** Every Low/Medium/High/Critical rating needs a brief rationale grounded in the actual system.
 - **Acknowledge uncertainty.** If you cannot determine something from the code alone (e.g., network configuration, cloud IAM policies), say so explicitly rather than guessing.
@@ -701,6 +723,7 @@ Before delivering or refreshing a threat model, walk through this checklist:
 13. Confirm the Prioritized Remediation Backlog lists every threat with `gap ≥ 0.20`, is sorted by residual mass, and its ΔARI estimates are consistent with the model's RC.
 14. Confirm every justified effectiveness override carries a written rationale (a bare custom `e` is invalid), and every 🚫 Eliminated status reflects genuine removal of the surface, not a strong mitigation.
 15. Confirm controls listed together on a threat are actually independent (no shared key, platform, library, or approver), and that retired entries are retained with strikethrough rather than deleted (deletion shrinks Risk Capacity and skews the ARI).
+16. Read Assets, Threats, and Countermeasures as a reader with no codebase access: no line numbers or file paths, no function/class names, no unglossed acronyms or tool names, concepts named in prose rather than raw identifiers, and every sentence passes the no-lookup test (see Write for Human Readers).
 
 Skipping this validation produces broken models that lose credibility on the first careful read.
 
@@ -819,7 +842,7 @@ A threat model is not a security audit, a penetration test, or a checklist of vu
 
 When in doubt, prefer:
 - Fewer, more credible threats over many speculative ones
-- Specific code references over abstract concerns
+- Specific observed behavior over abstract concerns — described in system terms, not code coordinates
 - Honest acknowledgment of uncertainty over confident-sounding guesses
 - Comparable metrics across refreshes (ARI) over one-shot heroics
 
