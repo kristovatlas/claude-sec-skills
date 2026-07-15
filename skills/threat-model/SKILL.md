@@ -11,7 +11,7 @@ Version: 7
 When changes are made to this document by an agent, please bump the version number.
 
 **Notable changes since v6:**
-- **Readability overhaul: analyze as an engineer, write for humans.** The security-engineer persona now governs analysis only — the document itself is written as a briefing for a mixed audience. A new "Write for Human Readers" section requires plain language throughout and **scant code references**: never line numbers, avoid file paths and function names (they mean nothing to most readers and go stale on trivially unrelated refactors — a rename breaks the reference without changing the threat model). The system is referred to by durable names (components, interfaces, roles, configuration surface); acronyms and tools are glossed on first use; concepts are named in prose rather than by code identifiers; precise code locations belong in the working notes, not the model. Enforced by a new validation item.
+- **Readability overhaul: analyze as an engineer, write for humans.** The security-engineer persona now governs analysis only — the document itself is written as a briefing for a mixed audience. A new "Write for Human Readers" section requires plain language throughout and **scant code references**: never line numbers, avoid file paths and function names (they mean nothing to most readers and go stale on trivially unrelated refactors — a rename breaks the reference without changing the threat model). The system is referred to by durable names (components, interfaces, roles, configuration surface); acronyms and tools are glossed on first use; concepts are named in prose rather than by code identifiers; precise code locations belong in the working notes, not the model. One deliberate exception: **commit hashes and PR numbers are encouraged as evidence when closing out risks** (Applied / Eliminated / Retired) — unlike paths and line numbers they are immutable, and they leave fact-checkers a durable breadcrumb trail. Enforced by a new validation item.
 - **ARI upgraded to the external ARI specification v1.1** (canonical source: https://github.com/kristovatlas/ari — check it for the latest version before generating or refreshing a model). v1.1 replaces the additive formula embedded in skill v3–v6 (retroactively "ARI v1.0") with a normalized **0–100 index, lower is safer** (`ARI = 100 × Risk Mass / Risk Capacity`), multiplicative defense-in-depth with a 0.03 floor, a 🚫 **Eliminated** control status, optional justified per-control effectiveness levels, grade bands capped by High-severity gates, and a `Δ_scope / Δ_controls` delta decomposition on refreshes. **v1.0 and v1.1 scores are not comparable** — models scored under v1.0 must be rebased on their next refresh (see Handling Existing Threat Models and Incremental Update Workflow, Step 7).
 
 **Notable changes since v5:**
@@ -59,6 +59,7 @@ Adopt the security-engineer persona to analyze; do not let it write. Nobody read
 2. **Scant code references — a threat model is not an audit report.** The model describes the *system* (components, roles, data flows, behaviors), not the code's coordinates.
    - **Never cite line numbers. Avoid file paths and function/class names.** They mean nothing to most readers, and they go stale trivially — a rename or refactor breaks the reference without changing the threat model at all.
    - Refer to the system by **durable, human-meaningful names**: components and services ("the webhook handler," "the billing worker"), interfaces (API routes, CLI commands), user roles, configuration surface (environment variables, config keys), and named third-party services or packages. These survive refactors and carry meaning on their own.
+   - **Exception — commits and pull requests as closure evidence.** When a risk's status changes — a countermeasure verified as Applied, a surface Eliminated, a threat retired — cite the commit hash or PR that made it so (e.g., "verified as of `9f3c2a1`", "surface removed in PR #142"). Unlike paths and line numbers, these are immutable and permanently resolvable, and they leave fact-checkers a direct trail. Keep them parenthetical: the sentence still describes the change in plain language.
    - Grounding is unchanged: every claim must still derive from code you actually read (see Prerequisites), and the Codebase Snapshot anchors what the claims were true against. When a precise code location would genuinely help the next maintainer, record it in the working-notes file — not in the model.
 3. **Gloss acronyms and tools on first use.** Assume no prior knowledge of niche libraries, vendor names, or security acronyms; give a short parenthetical gloss the first time — "CSP (Content-Security-Policy, a browser mechanism restricting where scripts can load from)" — then use the short form. Rule of thumb: gloss anything a competent product manager wouldn't recognize.
 4. **Name concepts in prose, not in code.** When a concept exists in code as an enum value, table, or type, give it a plain-language name — "the Administrator and Support-Staff user roles," "saved payment methods" — rather than reproducing the identifier. If disambiguation truly requires the identifier, it may follow in parentheses, once.
@@ -468,8 +469,8 @@ Assets Impacted:
 | ... | ... | ... | ... |
 
 Status values (these are the ARI effectiveness anchors — see the skill's Risk Index section):
-- **🚫 Eliminated**: The attack surface or asset was designed out entirely — removed, not guarded (deleted key, dropped endpoint, cut data field). Describe what was removed. This is the only status that zeroes a threat's coverage gap; reserve it for genuine removal, never for a strong mitigation.
-- **✅ Applied**: Evidence found in the codebase. Describe the evidence in system terms in the subsection — which component enforces it and what behavior you verified.
+- **🚫 Eliminated**: The attack surface or asset was designed out entirely — removed, not guarded (deleted key, dropped endpoint, cut data field). Describe what was removed and cite the commit or PR that removed it, where identifiable. This is the only status that zeroes a threat's coverage gap; reserve it for genuine removal, never for a strong mitigation.
+- **✅ Applied**: Evidence found in the codebase. Describe the evidence in system terms in the subsection — which component enforces it and what behavior you verified — and cite the commit or PR that introduced the control, where identifiable.
 - **⬜ Not Applied**: No evidence found. The subsection should include implementation guidance.
 - **⚠️ Partial**: Some aspects are implemented but gaps remain. The subsection should describe what's in place and what's missing.
 
@@ -477,7 +478,7 @@ Status values (these are the ARI effectiveness anchors — see the skill's Risk 
 
 **Status**: [🚫 Eliminated / ✅ Applied / ⬜ Not Applied / ⚠️ Partial][ · e = [X]% — [one-line justification; only when overriding the status's default effectiveness, per the skill's justified-effectiveness rules. A custom value with no rationale is invalid.]]
 
-[If Applied: 1-2 sentences describing the evidence — which component enforces this and what behavior you verified. System terms per Write for Human Readers; no file paths or line numbers.]
+[If Applied: 1-2 sentences describing the evidence — which component enforces this and what behavior you verified. System terms per Write for Human Readers; no file paths or line numbers. Cite the commit or PR that introduced or verified the control, where identifiable — e.g., "(added in PR #142)".]
 
 [If Not Applied or Partial: 2-5 sentences describing what should be done, why it mitigates the listed threats, and implementation guidance specific to this codebase. Be concrete and actionable.]
 
@@ -723,7 +724,7 @@ Before delivering or refreshing a threat model, walk through this checklist:
 13. Confirm the Prioritized Remediation Backlog lists every threat with `gap ≥ 0.20`, is sorted by residual mass, and its ΔARI estimates are consistent with the model's RC.
 14. Confirm every justified effectiveness override carries a written rationale (a bare custom `e` is invalid), and every 🚫 Eliminated status reflects genuine removal of the surface, not a strong mitigation.
 15. Confirm controls listed together on a threat are actually independent (no shared key, platform, library, or approver), and that retired entries are retained with strikethrough rather than deleted (deletion shrinks Risk Capacity and skews the ARI).
-16. Read Assets, Threats, and Countermeasures as a reader with no codebase access: no line numbers or file paths, no function/class names, no unglossed acronyms or tool names, concepts named in prose rather than raw identifiers, and every sentence passes the no-lookup test (see Write for Human Readers).
+16. Read Assets, Threats, and Countermeasures as a reader with no codebase access: no line numbers or file paths, no function/class names, no unglossed acronyms or tool names, concepts named in prose rather than raw identifiers, and every sentence passes the no-lookup test (see Write for Human Readers). Commit hashes and PR numbers cited as closure evidence are exempt — and encouraged: check that Applied / Eliminated / Retired entries carry one where identifiable.
 
 Skipping this validation produces broken models that lose credibility on the first careful read.
 
@@ -767,7 +768,7 @@ Before modifying anything, understand what changed:
 ### Step 3: Update Threats
 
 - **New threats**: Next available ID. Mark with **(New — [Month Year])**. Ensure ≥1 asset, ≥1 countermeasure, and a cited boundary (TB#) and actor (TA#).
-- **Retired threats**: Strike through; note retirement reason.
+- **Retired threats**: Strike through; note retirement reason and cite the commit or PR that closed it, where identifiable.
 - **Modified threats**: Update description, re-evaluate Likelihood/Impact/Severity, and re-confirm the boundary/actor citation. Note severity changes.
 - **Re-evaluate existing threats**: Even threats not directly affected may shift.
 
@@ -776,8 +777,8 @@ Before modifying anything, understand what changed:
 - **New countermeasures**: Next available ID. Link to threats they mitigate.
 - **Retired countermeasures**: Strike through; note reason.
 - **Modified countermeasures**: Update implementation guidance.
-- **Re-evaluate status**: Check whether previously unapplied countermeasures have been implemented, or whether applied countermeasures have been removed.
-- **Reclassify eliminations**: Where a change removed an attack surface outright (deleted key, dropped endpoint, cut data field), mark the control 🚫 Eliminated rather than ✅ Applied, and re-run the independence check on any threat listing multiple controls.
+- **Re-evaluate status**: Check whether previously unapplied countermeasures have been implemented, or whether applied countermeasures have been removed. Record the commit or PR evidencing each status change, where identifiable.
+- **Reclassify eliminations**: Where a change removed an attack surface outright (deleted key, dropped endpoint, cut data field), mark the control 🚫 Eliminated rather than ✅ Applied — citing the removing commit or PR — and re-run the independence check on any threat listing multiple controls.
 
 ### Step 5: Update Trust Boundaries and Threat Actors
 
@@ -829,9 +830,9 @@ When retiring a threat:
 ```markdown
 ## (T2) ~~AI Prompt Injection~~
 
-**Retired Nov 2025**: AI features were removed in v2.4 after cost-benefit review.
-The OpenRouter integration and all AI summarization code have been deleted. This
-threat no longer applies.
+**Retired Nov 2025**: AI features were removed in v2.4 (PR #88) after cost-benefit
+review. The OpenRouter integration and all AI summarization code have been deleted.
+This threat no longer applies.
 ```
 
 ---
