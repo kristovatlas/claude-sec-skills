@@ -7,8 +7,15 @@ description: Generate, refresh, or evaluate a STRIDE/LINDDUN threat model for an
 
 ## Intro
 
-Version: 7
+Version: 8
 When changes are made to this document by an agent, please bump the version number.
+
+**Notable changes since v7:**
+- **Two-layer element format — fixes a v7 over-correction.** v7's "scant code references" rule exiled all precise pointers to a non-deliverable working-notes file. In practice this vaguened the prose and lost actionable substance: specific findings collapsed into generic threats, the human reader gained nothing (they skim the narrative anyway), and automated auditors had to re-discover what each vague claim referred to. The real split is **narrative vs. index, not human vs. LLM**. Every Asset, Threat, and Countermeasure now carries a mandatory **Plain-language** block (v7's discipline unchanged: durable names only, no code coordinates) plus an optional, strictly additive **Technical detail** block with four labeled fields — **Anchors** (re-resolvable pointers; file paths and function/procedure names permitted here; line numbers banned everywhere), **Mechanism** (the precise code-level why), **Provenance** ("observed at `<commit>`"; commit/PR for control status changes), and **Verification** (what to read or grep). Two guardrails: anti-duplication (technical detail supplements, never restates, the plain claim) and anchoring bias (verification targets + provenance, not conclusions).
+- **Dual-use preamble.** The AI-notice now states the document is both a human reasoning aid and a seed for automated audit, and instructs automated readers to (1) confirm each anchor still resolves — a rename/move is a staleness signal, re-find by symbol; (2) verify every claim from code; (3) hunt beyond the listed items — absence implies nothing.
+- **Working-notes file demoted** back to a true scratchpad for raw observations and pending questions; load-bearing anchors now live in the deliverable's Technical-detail layer.
+- **Open Questions doubles as a Coverage & Unknowns map** — examined vs. not-examined areas plus every "could not verify" claim — so any reader can see where the prior pass stopped and where novel discovery is most needed.
+- **ARI is unchanged**: spec v1.1 exactly as in v7 — same formula, severity weights, gap/leakage table, multiplicative combination, 0.03 floor, grade bands, and High-severity gates — so models generated under v7 and v8 remain score-comparable. Only the presentation of findings changed, not the math.
 
 **Notable changes since v6:**
 - **Readability overhaul: analyze as an engineer, write for humans.** The security-engineer persona now governs analysis only — the document itself is written as a briefing for a mixed audience. A new "Write for Human Readers" section requires plain language throughout and **scant code references**: never line numbers, avoid file paths and function names (they mean nothing to most readers and go stale on trivially unrelated refactors — a rename breaks the reference without changing the threat model). The system is referred to by durable names (components, interfaces, roles, configuration surface); acronyms and tools are glossed on first use; concepts are named in prose rather than by code identifiers; precise code locations belong in the working notes, not the model. One deliberate exception: **commit hashes and PR numbers are encouraged as evidence when closing out risks** (Applied / Eliminated / Retired) — unlike paths and line numbers they are immutable, and they leave fact-checkers a durable breadcrumb trail. Enforced by a new validation item.
@@ -49,26 +56,48 @@ When producing or refreshing a threat model, adopt the perspective of a senior s
 - Calibrates ratings conservatively. A "Critical" rating means something specific (see Calibration Anchors below) and should not be used as a synonym for "important."
 - Treats ambiguity honestly. When a control's status can't be verified from the code alone, the model says so; it does not guess.
 
-This persona governs the **analysis** — what to examine, how skeptically, and how to calibrate. It does not govern the **writing**. The document itself is a briefing for a mixed audience of engineers, product owners, executives, and auditors, most of whom have never opened the codebase (see Write for Human Readers, below). Avoid filler, generic platitudes, and threats that aren't grounded in something you actually observed.
+This persona governs the **analysis** — what to examine, how skeptically, and how to calibrate. It does not govern the **writing**. The document itself serves a mixed audience of engineers, product owners, executives, auditors, and automated security auditors (see Write in Two Layers, below). Avoid filler, generic platitudes, and threats that aren't grounded in something you actually observed.
 
-## Write for Human Readers
+## Write in Two Layers
 
-Adopt the security-engineer persona to analyze; do not let it write. Nobody reading a threat model opens the codebase mid-sentence to decode a reference. Apply these rules to everything in the generated document:
+The generated model is **dual-use**: a reasoning aid for humans skimming for decisions, and a seed/index for automated (LLM-driven) security audits. Serve both by **layering each element — never by vaguening the prose**. A vague claim ("one read path lacks an ownership check") fails both readers at once: the human gets nothing more from it than from a specific claim, and the automated auditor must re-discover what it refers to.
 
-1. **Plain language throughout.** Describe every asset, threat, and countermeasure in terms of what the system does and what could go wrong for whom. A reader with no codebase familiarity must be able to understand every sentence unaided.
-2. **Scant code references — a threat model is not an audit report.** The model describes the *system* (components, roles, data flows, behaviors), not the code's coordinates.
-   - **Never cite line numbers. Avoid file paths and function/class names.** They mean nothing to most readers, and they go stale trivially — a rename or refactor breaks the reference without changing the threat model at all.
-   - Refer to the system by **durable, human-meaningful names**: components and services ("the webhook handler," "the billing worker"), interfaces (API routes, CLI commands), user roles, configuration surface (environment variables, config keys), and named third-party services or packages. These survive refactors and carry meaning on their own.
-   - **Exception — commits and pull requests as closure evidence.** When a risk's status changes — a countermeasure verified as Applied, a surface Eliminated, a threat retired — cite the commit hash or PR that made it so (e.g., "verified as of `9f3c2a1`", "surface removed in PR #142"). Unlike paths and line numbers, these are immutable and permanently resolvable, and they leave fact-checkers a direct trail. Keep them parenthetical: the sentence still describes the change in plain language.
-   - Grounding is unchanged: every claim must still derive from code you actually read (see Prerequisites), and the Codebase Snapshot anchors what the claims were true against. When a precise code location would genuinely help the next maintainer, record it in the working-notes file — not in the model.
-3. **Gloss acronyms and tools on first use.** Assume no prior knowledge of niche libraries, vendor names, or security acronyms; give a short parenthetical gloss the first time — "CSP (Content-Security-Policy, a browser mechanism restricting where scripts can load from)" — then use the short form. Rule of thumb: gloss anything a competent product manager wouldn't recognize.
-4. **Name concepts in prose, not in code.** When a concept exists in code as an enum value, table, or type, give it a plain-language name — "the Administrator and Support-Staff user roles," "saved payment methods" — rather than reproducing the identifier. If disambiguation truly requires the identifier, it may follow in parentheses, once.
-5. **The no-lookup test.** Read each subsection imagining you cannot open the codebase. If understanding any sentence would require doing so, rewrite the sentence.
+Every substantive element — each Asset, Threat, and Countermeasure (Trust Boundaries and Threat Actors may adopt the same split where useful) — carries:
+
+### Layer 1: Plain-language (mandatory)
+
+The durable claim, in prose a non-coder understands. For a threat: what could go wrong, who does it, what they gain, how bad. For a countermeasure: what protects you and against what. For an asset: what it is and why its loss hurts. Rules for this layer:
+
+- **No code coordinates.** Refer to the system by durable, human-meaningful names: components and services ("the webhook handler," "the billing worker"), interfaces (API routes, CLI commands), user roles, configuration surface (environment variables, config keys), and named third-party services or packages. These survive refactors and carry meaning on their own.
+- **Gloss acronyms and tools on first use.** Assume no prior knowledge of niche libraries, vendor names, or security acronyms; give a short parenthetical gloss the first time — "CSP (Content-Security-Policy, a browser mechanism restricting where scripts can load from)" — then use the short form. Rule of thumb: gloss anything a competent product manager wouldn't recognize.
+- **Name concepts in prose, not in code.** When a concept exists in code as an enum value, table, or type, give it a plain-language name — "the Administrator and Support-Staff user roles," "saved payment methods" — rather than reproducing the identifier.
+- **The no-lookup test.** A reader with no codebase access must understand every sentence unaided.
+- **Commits and PRs remain welcome here as closure evidence** (a countermeasure Applied, a surface Eliminated, a threat retired) — they are immutable and permanently resolvable. Keep them parenthetical: the sentence still describes the change in plain language.
+
+### Layer 2: Technical detail (optional, additive)
+
+Present only when there is genuine code-level substance — a pure governance/privacy threat may omit it. It must never restate the claim in jargon: it adds only what the plain layer deliberately left out, as four labeled fields:
+
+- **Anchors** — the re-resolvable pointers: RPC procedure names, route paths, model/table names, env vars, config keys, file paths, and internal function/procedure names are permitted here. **Line numbers are banned everywhere, including here** — they break on any unrelated edit.
+- **Mechanism** — the precise code-level why: the exact missing check, the specific data flow, the concrete condition. This is the actionable substance a plain summary necessarily omits.
+- **Provenance** — "observed at `<commit>`," so any reader knows what version the anchor and mechanism were true against. For countermeasures, cite the commit/PR that applied or eliminated the control (extends the closure-evidence practice to all anchors).
+- **Verification** — how to confirm it from code: what to read or grep. Phrase anchors as *where to look*, not *what to conclude*.
+
+**Two guardrails:**
+
+- **Anti-duplication.** The technical detail is a supplement, not a translation. If a technical block merely re-explains the plain claim, delete it. One claim, stated once, in the plain layer.
+- **Anchoring bias.** The technical layer is verification targets + provenance, not conclusions. It must not read as "here is the confirmed bug at X" — an automated reader must verify from code, not inherit findings.
+
+Grounding is unchanged: every claim in either layer must derive from code you actually read (see Prerequisites), and the Codebase Snapshot anchors what the claims were true against.
 
 Example (invented):
 
-- Poor: "`session_mint()` in `auth/tokens.py:141` lacks a nonce check, so `SessionToken` rows are replayable."
-- Better: "Login tokens can be replayed: a captured token can be reused to impersonate its owner, because the login service does not bind tokens to a one-time value."
+- **Plain-language:** "Login tokens can be replayed: a captured token can be reused to impersonate its owner, because the login service does not bind tokens to a one-time value."
+- **Technical detail:**
+  - Anchors: token issuance and validation in the auth service (`auth/tokens.py` — `session_mint`, `session_validate`).
+  - Mechanism: issuance signs the session payload but includes no nonce or single-use counter, so an intercepted token passes validation any number of times until expiry.
+  - Provenance: observed at `9f3c2a1`.
+  - Verification: read the token issuance and validation paths; grep the auth service for nonce/jti or replay-cache handling.
 
 ## Prerequisites
 
@@ -150,13 +179,13 @@ If the existing model pre-dates v6, bring it forward incrementally: add the Trus
 
 If the existing model's ARI was computed under spec v1.0 (any model generated by skill v6 or earlier), the score must be **rebased** under the current spec on the next refresh — v1.0 and v1.1 scores are not comparable (see Incremental Update Workflow, Step 7).
 
+If the existing model pre-dates v8, on refresh: split each element subsection into the Plain-language + optional Technical-detail format (recovering any precise anchors from the working-notes file into the Technical-detail layer, with fresh provenance stamps), replace the NOTICE block with the current canonical text (v8 added the dual-use clause and automated-reader instructions), and add the Coverage & Unknowns map. The ARI does not change — v7 and v8 use the same spec v1.1, so scores carry forward. Record each structural change as a Change Log line.
+
 ## Working Notes File
 
 For large or complex models, maintain a sibling working-notes file (e.g., `docs/threat-model-notes.md`) where you can capture meeting notes, raw observations, research findings, and pending questions before they are synthesized into the formal threat model. This separation lets you preserve the user's voice and intermediate context without polluting the formal doc.
 
-The working-notes file is not a deliverable — it's a scratchpad. The formal `THREAT_MODEL.md` synthesizes from it. When asked to update the threat model, check the working notes first.
-
-The working notes are also the home for **precise code locations** (file paths, function names, line references) gathered during analysis. The formal model refers to the system in durable, human-meaningful terms (see Write for Human Readers); the breadcrumbs that let the next refresher re-find the exact code belong here.
+The working-notes file is not a deliverable — it's a true scratchpad for raw observations, meeting notes, research trails, and pending questions. **Load-bearing findings do not live here**: anchors, mechanisms, and provenance belong in the deliverable's Technical-detail layer (see Write in Two Layers), where both human and automated readers can find them. The formal `THREAT_MODEL.md` synthesizes from the notes; when asked to update the threat model, check the working notes first.
 
 ## Risk Index and Grading
 
@@ -295,7 +324,7 @@ No bullet may be left untagged. An untagged bullet is an orphan — exactly the 
 
 Every generated threat model must include the `# NOTICE TO AI ASSISTANTS AND AUTOMATED REVIEWERS` block exactly as it appears in the template below. Do not paraphrase, summarize, or omit it. The canonical text lives only inside the template — there is no separate copy elsewhere in this skill, so when generating a doc, copy it directly from the template.
 
-When refreshing a threat model that pre-dates v5, add the block in the same position (after `Doc version:`, before `# Intro`) and record the addition as a single-line entry in the Change Log.
+When refreshing a threat model that pre-dates v5, add the block in the same position (after `Doc version:`, before `# Intro`) and record the addition as a single-line entry in the Change Log. When refreshing a model that pre-dates v8, replace the block with the current canonical text — v8 added the dual-use clause and the automated-reader instructions — and record the update in the Change Log.
 
 ## Output Format
 
@@ -315,6 +344,8 @@ Doc version: [doc version — bump on every refresh]
 
 This document is a **working hypothesis**, not a verified security analysis. Read this notice fully before using anything below.
 
+This document is **dual-use**: a reasoning aid for human readers and a seed for automated (LLM-driven) security audits. It is a working hypothesis for both audiences.
+
 ## How to use this document
 
 - Treat the contents as **a starting set of questions and known concerns**, not as conclusions, guarantees, or ground truth about the code.
@@ -329,6 +360,12 @@ This document is a **working hypothesis**, not a verified security analysis. Rea
 - **Incomplete:** threats, assets, or attack surfaces may be missing entirely. Absence here implies nothing.
 - **Incorrect:** assumptions about how the system works, what data flows where, or which mitigations are in place may be wrong.
 - **Aspirational:** some mitigations described may be planned, partially implemented, or intended rather than actually present in the current code.
+
+## If you are an automated reader
+
+1. **Confirm each anchor still resolves.** Technical-detail anchors were true at their stated provenance commit; a renamed or moved symbol is a staleness signal — re-find it by symbol before concluding anything about it.
+2. **Verify every claim from the code.** Anchors and mechanisms are where to look, not what to conclude.
+3. **Hunt beyond the listed items.** Absence from this document implies nothing. The Coverage & Unknowns map (in Open Questions) shows where prior passes stopped — that is where novel discovery is most needed.
 
 ## If you are asked to validate this document
 
@@ -420,9 +457,15 @@ If no proposed changes are known, write "No proposed changes are currently under
 
 ## (A1) [Asset Title]
 
-[2-4 sentences, in plain language per Write for Human Readers, describing what this asset is, why an attacker would target it, and any special considerations (e.g., data sensitivity, blast radius of compromise). Name the asset in domain terms, not by its code identifier. End with the value rating and a one-sentence justification. Intangible assets follow the same format — describe the harm their loss causes.]
+**Plain-language:** [2-4 sentences a non-coder understands: what this asset is, why an attacker would target it, why its loss hurts, and any special considerations (data sensitivity, blast radius of compromise). Durable names only — no code coordinates; see Write in Two Layers. Intangible assets follow the same format — describe the harm their loss causes.]
 
 As [justification], the value is rated **[Value]**.
+
+**Technical detail:** [optional, additive — include only when there is code-level substance the plain layer omits]
+- Anchors: [re-resolvable pointers: model/table names, routes, config keys, file paths, function/procedure names — no line numbers]
+- Mechanism: [code-level specifics of where and how this asset lives or is exposed]
+- Provenance: [observed at `<commit>`]
+- Verification: [what to read or grep to confirm]
 
 [Repeat for each asset.]
 
@@ -445,7 +488,7 @@ Severity matrix:
 
 ## (T1) [Threat Title]
 
-[2-4 sentences, in plain language per Write for Human Readers, explaining the attack vector, how it would be carried out against THIS specific application, and what the attacker gains. Ground it in the concrete behavior, interface, or configuration you observed — described in system terms (no file paths, function names, or line numbers). If this threat is introduced by proposed changes, mark it with "(New)".]
+**Plain-language:** [2-4 sentences a non-coder understands: what could go wrong, who does it, what they gain, and how bad — the attack vector against THIS specific application, in system terms with durable names only (no code coordinates; see Write in Two Layers). If introduced by proposed changes, mark with "(New)".]
 
 Crosses: (TB1) [Boundary name]
 Actor(s): (TA1) [Actor name]
@@ -453,6 +496,12 @@ Actor(s): (TA1) [Actor name]
 Assets Impacted:
 - (A1) [Asset Name]
 - [...]
+
+**Technical detail:** [optional, additive — omit for pure governance/privacy threats; never a jargon restatement of the plain claim]
+- Anchors: [re-resolvable pointers: RPC procedure names, route paths, model/table names, env vars, config keys, file paths, function/procedure names — no line numbers]
+- Mechanism: [the exact missing check, the specific data flow, or the concrete condition]
+- Provenance: [observed at `<commit>`]
+- Verification: [what to read or grep to confirm — where to look, not what to conclude]
 
 [Repeat for each threat.]
 
@@ -469,8 +518,8 @@ Assets Impacted:
 | ... | ... | ... | ... |
 
 Status values (these are the ARI effectiveness anchors — see the skill's Risk Index section):
-- **🚫 Eliminated**: The attack surface or asset was designed out entirely — removed, not guarded (deleted key, dropped endpoint, cut data field). Describe what was removed and cite the commit or PR that removed it, where identifiable. This is the only status that zeroes a threat's coverage gap; reserve it for genuine removal, never for a strong mitigation.
-- **✅ Applied**: Evidence found in the codebase. Describe the evidence in system terms in the subsection — which component enforces it and what behavior you verified — and cite the commit or PR that introduced the control, where identifiable.
+- **🚫 Eliminated**: The attack surface or asset was designed out entirely — removed, not guarded (deleted key, dropped endpoint, cut data field). Describe what was removed and cite the removing commit or PR, where identifiable (Technical detail → Provenance). This is the only status that zeroes a threat's coverage gap; reserve it for genuine removal, never for a strong mitigation.
+- **✅ Applied**: Evidence found in the codebase. Describe the evidence in plain language in the subsection — which component enforces it and what behavior you verified — and cite the commit or PR that introduced the control, where identifiable (Technical detail → Provenance).
 - **⬜ Not Applied**: No evidence found. The subsection should include implementation guidance.
 - **⚠️ Partial**: Some aspects are implemented but gaps remain. The subsection should describe what's in place and what's missing.
 
@@ -478,11 +527,13 @@ Status values (these are the ARI effectiveness anchors — see the skill's Risk 
 
 **Status**: [🚫 Eliminated / ✅ Applied / ⬜ Not Applied / ⚠️ Partial][ · e = [X]% — [one-line justification; only when overriding the status's default effectiveness, per the skill's justified-effectiveness rules. A custom value with no rationale is invalid.]]
 
-[If Applied: 1-2 sentences describing the evidence — which component enforces this and what behavior you verified. System terms per Write for Human Readers; no file paths or line numbers. Cite the commit or PR that introduced or verified the control, where identifiable — e.g., "(added in PR #142)".]
+**Plain-language:** [What protects you and against what, in prose a non-coder understands (durable names only; see Write in Two Layers). If Applied: which component enforces it and what behavior you verified — cite the introducing commit or PR where identifiable, e.g., "(added in PR #142)". If Not Applied or Partial: what should be done and why it mitigates the listed threats. If Partial: additionally, what IS in place and what gaps remain.]
 
-[If Not Applied or Partial: 2-5 sentences describing what should be done, why it mitigates the listed threats, and implementation guidance specific to this codebase. Be concrete and actionable.]
-
-[If Partial: Additionally describe what IS in place and what gaps remain.]
+**Technical detail:** [optional, additive — include only when there is code-level substance the plain layer omits]
+- Anchors: [where the control lives or should live: routes, middleware/component names, config keys, file paths, function/procedure names — no line numbers]
+- Mechanism: [how the control works at code level; the precise gap if Partial; what to build if Not Applied]
+- Provenance: [commit/PR that applied or eliminated the control; otherwise observed at `<commit>`]
+- Verification: [how to confirm the status from code — what to read or grep]
 
 Threats Mitigated:
 - (T1) [Threat Name]
@@ -550,6 +601,8 @@ This document is intended to be refreshed iteratively rather than rewritten. Bef
 7. **Cross-check redesign impact.** When the user mentions a redesign, evaluate which threats it changes status on and which it introduces, and update the ARI accordingly. Present projected ARI alongside current ARI in the Proposed Changes and Redesigns section.
 8. **Validate cross-references** before delivering (see Cross-Reference Validation in the skill).
 9. **Bump the doc version** in the header on every substantive edit. Skill version is separate from doc version.
+10. **Re-verify Technical-detail anchors.** On refresh, confirm each anchor still resolves at the new snapshot; update renamed or moved anchors (re-find by symbol) and re-stamp their provenance.
+11. **Refresh the Coverage & Unknowns map** to reflect what this pass examined, what remains unexamined, and what still could not be verified from code.
 
 # Open Questions for the Team
 
@@ -558,6 +611,14 @@ This document is intended to be refreshed iteratively rather than rewritten. Bef
 1. [Question 1]
 2. [Question 2]
 3. ...
+
+## Coverage & Unknowns
+
+[The map of where this pass stopped — so the next reader, human or automated, can see the boundaries of prior analysis and where novel discovery is most needed.]
+
+- **Examined:** [components, areas, and integrations actually analyzed in this pass, against the snapshot commit]
+- **Not examined:** [components, integrations, configurations, or environments not analyzed, and why]
+- **Could not verify from code alone:** [every claim marked uncertain in the body, restated here — e.g., cloud IAM policies, network configuration, operational practices]
 
 # Change Log
 
@@ -629,7 +690,7 @@ Examples of assets include: database records, source code, non-financial PII (em
 ### Countermeasures
 
 - **Every threat must have at least one countermeasure.** Most countermeasures mitigate multiple threats.
-- Be specific and actionable — but in system terms: name the component, behavior, library, or configuration involved, so a reader can follow it without opening the codebase (see Write for Human Readers).
+- Be specific and actionable. The plain-language block names the component, behavior, library, or configuration in system terms; code-level specifics (anchors, mechanism, provenance, verification) go in the Technical-detail block (see Write in Two Layers).
 - Include both preventive (stop the attack) and detective (notice the attack) countermeasures where appropriate.
 - Suggest specific tools or libraries where relevant (e.g., `socket.dev` for dependency scanning, `helmet` for Express headers, OpenZeppelin `TimelockController` for on-chain admin throttling).
 - For privacy threats, countermeasures are often procedural or documentary (a retention policy, a lawful-basis record, a DPIA, a privacy notice, a deletion job) as much as technical. They are tracked and scored exactly like technical countermeasures and appear in the backlog.
@@ -698,10 +759,10 @@ Adapt the threat model to the domain of the system being analyzed. Consult the r
 ### General Quality Standards
 
 - **No generic filler.** Every sentence should convey information specific to the application being analyzed.
-- **Write for human readers.** Plain language; scant code references (never line numbers; avoid file paths and function names); acronyms and tools glossed on first use; concepts named in prose, not by code identifiers. See Write for Human Readers.
+- **Write in two layers.** Every element carries a mandatory Plain-language block (durable names, glossed acronyms, no code coordinates, no-lookup test) and — only where there is code-level substance — an additive Technical-detail block (Anchors / Mechanism / Provenance / Verification; file paths and function names allowed there; line numbers banned everywhere). See Write in Two Layers.
 - **Cross-reference consistently.** Asset IDs (A1, A2...), Trust Boundary IDs (TB1, TB2...), Threat Actor IDs (TA1, TA2...), Threat IDs (T1, T2...), and Countermeasure IDs (C1, C2...) must be used consistently across all tables and subsections. Every STRIDE/LINDDUN bullet carries a disposition tag.
 - **Justify ratings.** Every Low/Medium/High/Critical rating needs a brief rationale grounded in the actual system.
-- **Acknowledge uncertainty.** If you cannot determine something from the code alone (e.g., network configuration, cloud IAM policies), say so explicitly rather than guessing.
+- **Acknowledge uncertainty.** If you cannot determine something from the code alone (e.g., network configuration, cloud IAM policies), say so explicitly rather than guessing — and restate every such uncertainty in the Coverage & Unknowns map (Open Questions section).
 - **Consider proposed changes.** If the user mentions planned features or you see feature branches, analyze how they change the threat landscape. Mark new assets, threats, and countermeasures with **(New)** and project the post-redesign ARI in the Proposed Changes section.
 - **Ensure complete coverage.** Run the cross-reference validation as a final step.
 
@@ -724,7 +785,13 @@ Before delivering or refreshing a threat model, walk through this checklist:
 13. Confirm the Prioritized Remediation Backlog lists every threat with `gap ≥ 0.20`, is sorted by residual mass, and its ΔARI estimates are consistent with the model's RC.
 14. Confirm every justified effectiveness override carries a written rationale (a bare custom `e` is invalid), and every 🚫 Eliminated status reflects genuine removal of the surface, not a strong mitigation.
 15. Confirm controls listed together on a threat are actually independent (no shared key, platform, library, or approver), and that retired entries are retained with strikethrough rather than deleted (deletion shrinks Risk Capacity and skews the ARI).
-16. Read Assets, Threats, and Countermeasures as a reader with no codebase access: no line numbers or file paths, no function/class names, no unglossed acronyms or tool names, concepts named in prose rather than raw identifiers, and every sentence passes the no-lookup test (see Write for Human Readers). Commit hashes and PR numbers cited as closure evidence are exempt — and encouraged: check that Applied / Eliminated / Retired entries carry one where identifiable.
+16. Read every **Plain-language** block as a reader with no codebase access: no code coordinates (line numbers, file paths, function/class names) in plain-language prose, no unglossed acronyms or tool names, concepts named in prose rather than raw identifiers, and every sentence passes the no-lookup test (see Write in Two Layers). Commit hashes and PR numbers cited as closure evidence are exempt — and encouraged: check that Applied / Eliminated / Retired entries carry one where identifiable.
+17. Confirm every Asset, Threat, and Countermeasure subsection has a **Plain-language** block — the mandatory layer is never missing.
+18. Confirm **no line numbers appear anywhere** in the document — including Technical-detail Anchors.
+19. Confirm every **Technical-detail block is additive**: none merely restates its plain-language claim in jargon. Delete any that does.
+20. Confirm every anchor in a Technical-detail block is **provenance-stamped** ("observed at `<commit>`", or the applying commit/PR for countermeasures).
+21. Confirm the NOTICE preamble includes the **dual-use clause** and the three automated-reader instructions (confirm anchors resolve, verify from code, hunt beyond the listed items).
+22. Confirm Open Questions for the Team includes the **Coverage & Unknowns map**: examined vs. not-examined areas, and every "could not verify" claim from the body restated there.
 
 Skipping this validation produces broken models that lose credibility on the first careful read.
 
@@ -769,14 +836,14 @@ Before modifying anything, understand what changed:
 
 - **New threats**: Next available ID. Mark with **(New — [Month Year])**. Ensure ≥1 asset, ≥1 countermeasure, and a cited boundary (TB#) and actor (TA#).
 - **Retired threats**: Strike through; note retirement reason and cite the commit or PR that closed it, where identifiable.
-- **Modified threats**: Update description, re-evaluate Likelihood/Impact/Severity, and re-confirm the boundary/actor citation. Note severity changes.
+- **Modified threats**: Update description, re-evaluate Likelihood/Impact/Severity, re-confirm the boundary/actor citation, and re-verify any Technical-detail anchors (re-stamp provenance). Note severity changes.
 - **Re-evaluate existing threats**: Even threats not directly affected may shift.
 
 ### Step 4: Update Countermeasures
 
 - **New countermeasures**: Next available ID. Link to threats they mitigate.
 - **Retired countermeasures**: Strike through; note reason.
-- **Modified countermeasures**: Update implementation guidance.
+- **Modified countermeasures**: Update implementation guidance; re-verify Technical-detail anchors and re-stamp provenance.
 - **Re-evaluate status**: Check whether previously unapplied countermeasures have been implemented, or whether applied countermeasures have been removed. Record the commit or PR evidencing each status change, where identifiable.
 - **Reclassify eliminations**: Where a change removed an attack surface outright (deleted key, dropped endpoint, cut data field), mark the control 🚫 Eliminated rather than ✅ Applied — citing the removing commit or PR — and re-run the independence check on any threat listing multiple controls.
 
