@@ -7,8 +7,12 @@ description: Generate, refresh, or evaluate a STRIDE/LINDDUN threat model for an
 
 ## Intro
 
-Version: 6
+Version: 7
 When changes are made to this document by an agent, please bump the version number.
+
+**Notable changes since v6:**
+- **Readability overhaul: analyze as an engineer, write for humans.** The security-engineer persona now governs analysis only — the document itself is written as a briefing for a mixed audience. A new "Write for Human Readers" section requires plain language throughout and **scant code references**: never line numbers, avoid file paths and function names (they mean nothing to most readers and go stale on trivially unrelated refactors — a rename breaks the reference without changing the threat model). The system is referred to by durable names (components, interfaces, roles, configuration surface); acronyms and tools are glossed on first use; concepts are named in prose rather than by code identifiers; precise code locations belong in the working notes, not the model. One deliberate exception: **commit hashes and PR numbers are encouraged as evidence when closing out risks** (Applied / Eliminated / Retired) — unlike paths and line numbers they are immutable, and they leave fact-checkers a durable breadcrumb trail. Enforced by a new validation item.
+- **ARI upgraded to the external ARI specification v1.1** (canonical source: https://github.com/kristovatlas/ari — check it for the latest version before generating or refreshing a model). v1.1 replaces the additive formula embedded in skill v3–v6 (retroactively "ARI v1.0") with a normalized **0–100 index, lower is safer** (`ARI = 100 × Risk Mass / Risk Capacity`), multiplicative defense-in-depth with a 0.03 floor, a 🚫 **Eliminated** control status, optional justified per-control effectiveness levels, grade bands capped by High-severity gates, and a `Δ_scope / Δ_controls` delta decomposition on refreshes. **v1.0 and v1.1 scores are not comparable** — models scored under v1.0 must be rebased on their next refresh (see Handling Existing Threat Models and Incremental Update Workflow, Step 7).
 
 **Notable changes since v5:**
 - **Trust Boundaries** and **Threat Actors** are now required, first-class sections of every generated model, each with its own ID space (`TB#`, `TA#`). Every threat must cite the boundary it crosses and the actor(s) capable of executing it, and every boundary and actor must be implicated by at least one threat.
@@ -45,7 +49,26 @@ When producing or refreshing a threat model, adopt the perspective of a senior s
 - Calibrates ratings conservatively. A "Critical" rating means something specific (see Calibration Anchors below) and should not be used as a synonym for "important."
 - Treats ambiguity honestly. When a control's status can't be verified from the code alone, the model says so; it does not guess.
 
-Match the tone to the audience. Engineers reading this should be able to act on it. Avoid filler, generic platitudes, and threats that aren't grounded in something you actually observed.
+This persona governs the **analysis** — what to examine, how skeptically, and how to calibrate. It does not govern the **writing**. The document itself is a briefing for a mixed audience of engineers, product owners, executives, and auditors, most of whom have never opened the codebase (see Write for Human Readers, below). Avoid filler, generic platitudes, and threats that aren't grounded in something you actually observed.
+
+## Write for Human Readers
+
+Adopt the security-engineer persona to analyze; do not let it write. Nobody reading a threat model opens the codebase mid-sentence to decode a reference. Apply these rules to everything in the generated document:
+
+1. **Plain language throughout.** Describe every asset, threat, and countermeasure in terms of what the system does and what could go wrong for whom. A reader with no codebase familiarity must be able to understand every sentence unaided.
+2. **Scant code references — a threat model is not an audit report.** The model describes the *system* (components, roles, data flows, behaviors), not the code's coordinates.
+   - **Never cite line numbers. Avoid file paths and function/class names.** They mean nothing to most readers, and they go stale trivially — a rename or refactor breaks the reference without changing the threat model at all.
+   - Refer to the system by **durable, human-meaningful names**: components and services ("the webhook handler," "the billing worker"), interfaces (API routes, CLI commands), user roles, configuration surface (environment variables, config keys), and named third-party services or packages. These survive refactors and carry meaning on their own.
+   - **Exception — commits and pull requests as closure evidence.** When a risk's status changes — a countermeasure verified as Applied, a surface Eliminated, a threat retired — cite the commit hash or PR that made it so (e.g., "verified as of `9f3c2a1`", "surface removed in PR #142"). Unlike paths and line numbers, these are immutable and permanently resolvable, and they leave fact-checkers a direct trail. Keep them parenthetical: the sentence still describes the change in plain language.
+   - Grounding is unchanged: every claim must still derive from code you actually read (see Prerequisites), and the Codebase Snapshot anchors what the claims were true against. When a precise code location would genuinely help the next maintainer, record it in the working-notes file — not in the model.
+3. **Gloss acronyms and tools on first use.** Assume no prior knowledge of niche libraries, vendor names, or security acronyms; give a short parenthetical gloss the first time — "CSP (Content-Security-Policy, a browser mechanism restricting where scripts can load from)" — then use the short form. Rule of thumb: gloss anything a competent product manager wouldn't recognize.
+4. **Name concepts in prose, not in code.** When a concept exists in code as an enum value, table, or type, give it a plain-language name — "the Administrator and Support-Staff user roles," "saved payment methods" — rather than reproducing the identifier. If disambiguation truly requires the identifier, it may follow in parentheses, once.
+5. **The no-lookup test.** Read each subsection imagining you cannot open the codebase. If understanding any sentence would require doing so, rewrite the sentence.
+
+Example (invented):
+
+- Poor: "`session_mint()` in `auth/tokens.py:141` lacks a nonce check, so `SessionToken` rows are replayable."
+- Better: "Login tokens can be replayed: a captured token can be reused to impersonate its owner, because the login service does not bind tokens to a one-time value."
 
 ## Prerequisites
 
@@ -125,64 +148,86 @@ If a `THREAT_MODEL.md` (or equivalent) already exists in the repo, **never assum
 
 If the existing model pre-dates v6, bring it forward incrementally: add the Trust Boundaries, Threat Actors, and Prioritized Remediation Backlog sections; tag every STRIDE/LINDDUN bullet with its disposition; and move the STRIDE/LINDDUN analyses to the Brainstorming Appendix. Record each structural addition as a single Change Log line rather than rewriting the model wholesale.
 
+If the existing model's ARI was computed under spec v1.0 (any model generated by skill v6 or earlier), the score must be **rebased** under the current spec on the next refresh — v1.0 and v1.1 scores are not comparable (see Incremental Update Workflow, Step 7).
+
 ## Working Notes File
 
 For large or complex models, maintain a sibling working-notes file (e.g., `docs/threat-model-notes.md`) where you can capture meeting notes, raw observations, research findings, and pending questions before they are synthesized into the formal threat model. This separation lets you preserve the user's voice and intermediate context without polluting the formal doc.
 
 The working-notes file is not a deliverable — it's a scratchpad. The formal `THREAT_MODEL.md` synthesizes from it. When asked to update the threat model, check the working notes first.
 
+The working notes are also the home for **precise code locations** (file paths, function names, line references) gathered during analysis. The formal model refers to the system in durable, human-meaningful terms (see Write for Human Readers); the breadcrumbs that let the next refresher re-find the exact code belong here.
+
 ## Risk Index and Grading
 
 Every threat model must include an **Aggregate Risk Index (ARI)** so that risk can be compared across versions of the model and across proposed redesigns.
 
+**Canonical specification.** ARI is defined by the external ARI spec maintained at **https://github.com/kristovatlas/ari**. This skill embeds **ARI v1.1** (2026-07). Before generating or refreshing a model, check the spec repo for a newer version; if the spec has moved beyond what is embedded here, follow the spec, cite the exact spec version in the model's footer, and flag that this skill needs updating. The essentials are embedded below so a model can be scored without leaving this document; consult the spec for the full design rationale, reference implementation, and worked examples.
+
+ARI is a **0–100 index, lower is safer**: the fraction of the model's identified risk that remains unmitigated, weighted by severity and discounted by control coverage. `0` = every threat eliminated or deeply mitigated; `100` = every threat wide open. It is a *coverage index*, not an actuarial estimate — its value is comparability across versions of one model (and, because it is normalized, roughly across models of different sizes).
+
 **Formula:**
 
 ```
-ARI = Σ (severity_weight(T) × coverage_gap(T))   over all threats T
+Risk Mass      RM = Σ severity_weight(T) × gap(T)    # weighted residual (secondary diagnostic)
+Risk Capacity  RC = Σ severity_weight(T)             # every threat fully open
+ARI               = 100 × RM / RC                    # 0–100, lower is safer
 
-severity_weight:
-  Low      = 1
-  Medium   = 3
-  High     = 5
-
-coverage_gap:
-  if any mitigating countermeasure is Applied  (✅)  → 0.10
-  elif any is Partial                          (⚠️)  → 0.50
-  else (only Not Applied / ⬜)                       → 1.00
+severity_weight:  Low = 1   Medium = 3   High = 5   (Critical = 8, only if the model uses a Critical severity tier for threats)
 ```
 
-Rationale: an applied countermeasure does not eliminate residual risk (defects exist, monitoring lags); 0.10 leaves a small floor. A partial countermeasure halves the gap. An unmitigated threat contributes its full severity weight.
+**Per-threat coverage gap.** Each countermeasure has an **effectiveness** `e` (the fraction of risk it removes) and a **leakage** `1 − e`. The four status labels are default anchors on that scale:
 
-**Grade mapping:**
+| Status | Default `e` | Leakage `1 − e` |
+| --- | --- | --- |
+| 🚫 **Eliminated** — attack surface or asset designed out (removed, not guarded) | 100% | **0.00** (absorbing) |
+| ✅ **Applied** — control present in code, verified | 80% | **0.20** |
+| ⚠️ **Partial** — some aspects present, gaps remain | 50% | **0.50** |
+| ⬜ **Not Applied** — planned/absent | 0% | *excluded* |
 
-| ARI    | Grade | Interpretation                                                           |
-| ------ | ----- | ------------------------------------------------------------------------ |
-| ≤ 15   | A     | Mature; only residual risk in fully-mitigated threats.                   |
-| 16–35  | B     | A small number of partial or open gaps; no high-severity open threats.   |
-| 36–65  | C     | Acceptable for staging; one or two unmitigated high-severity threats.    |
-| 66–100 | D     | Material exposure; multiple high-severity threats are open or partial.   |
-| > 100  | F     | Many high-severity threats are open; do not deploy to production.        |
+Combine each threat's *present* controls multiplicatively (defense-in-depth):
 
-**Worked example.** Suppose a system has three threats:
+```
+gap(T) = 0.00                            if any control of T is 🚫 Eliminated
+         max(0.03, Π leakage(c))         otherwise, over present controls; none present → 1.00 (fully open)
+```
 
-- T1: High severity, one countermeasure Applied → contributes `5 × 0.10 = 0.5`.
-- T2: High severity, one countermeasure Partial → contributes `5 × 0.50 = 2.5`.
-- T3: Medium severity, no countermeasure Applied → contributes `3 × 1.00 = 3.0`.
+Reference points: none → **1.00** · 1 Partial → **0.50** · 1 Applied → **0.20** · 1 Applied + 1 Partial → **0.10** · 2 independent Applied → **0.04** · ≥3 independent Applied → **0.03** (floor) · any Eliminated → **0.00**. Only elimination clears the `0.03` floor — a guarded risk never truly reaches zero (defects exist, monitoring lags, controls share failure modes). Reserve 🚫 Eliminated for genuine removal (deleted key, dropped endpoint, cut data field), never for "mitigated really well."
 
-ARI = 6.0, Grade A.
+Two rules keep the gap honest:
 
-**Worked example 2.** A larger system with 30 threats — mix of severities, several Highs unmitigated — typically yields ARI in the 60–100 range, Grade D. The score makes the qualitative state explicit.
+- **Independence.** Multiplication assumes controls fail independently. Controls sharing a failure mode — same key, same platform, same library, same human approver — count as **one**. Don't inflate defense-in-depth by listing correlated controls.
+- **Justified effectiveness (optional).** A control may carry a custom `e` in place of its status default **only with a written one-line rationale** in its countermeasure subsection (e.g. `⚠️ Partial · e = 65% — blocks the inline/eval vectors; residual is one un-vetted script-src origin`). A bare custom number is invalid — fall back to the default. Round *down* when unsure; quantize to 5% steps; no 100% short of elimination; `e > 80%` demands strong, specific justification, especially where it would clear a severity gate.
+
+**Grade.** The grade is the ARI band, then **capped** (never raised) by severity gates keyed on High/Critical threats (weight ≥ 5), so a pile of well-covered low-severity threats can't mask an open High:
+
+| ARI (0–100) | Band | | Gate condition | Grade cap |
+| --- | --- | --- | --- | --- |
+| ≤ 10 | A | | Any High/Critical with `gap > 0.10` | no better than **B** |
+| 10 – 25 | B | | Any High/Critical with `gap ≥ 0.50` | no better than **C** |
+| 25 – 45 | C | | Two+ High/Critical with `gap ≥ 0.50` | no better than **D** |
+| 45 – 70 | D | | Three+ High/Critical fully open (`gap = 1.0`) | **F** |
+| > 70 | F | | | |
+
+`final_grade = worst( band(ARI), all triggered gate caps )`. The letter is coarse — **always report the number too**; meaningful movement often happens within a band.
+
+**Worked example.** Three threats: T1 High with one Applied control (`gap 0.20`), T2 High with one Partial (`0.50`), T3 Medium fully open (`1.00`). `RC = 5+5+3 = 13`; `RM = 5×0.20 + 5×0.50 + 3×1.00 = 6.5`; **ARI = 100 × 6.5/13 = 50.0** → Grade D. After adding an independent second control to T2 (`0.20 × 0.50 = gap 0.10`) and applying a control to T3 (`gap 0.20`): `RM = 1.0 + 0.5 + 0.6 = 2.1`, **ARI = 16.2** → band B; T1's `gap 0.20 > 0.10` triggers the no-better-than-B gate, which band B already satisfies — **Grade B**. Note that normalization *rewards* thoroughness: adding a well-mitigated threat grows RC faster than RM, so the ARI drops rather than penalizing the model for its size.
+
+**Retention rule (scoring-critical).** Retired threats must be *kept* as closed entries (struck through, dated) — never deleted. Deleting a mitigated threat shrinks Risk Capacity and perversely **raises** the ARI; retiring it in place lowers the ARI as risk is retired over time. The skill's never-delete convention is therefore a scoring requirement, not just audit hygiene.
 
 **How to present the ARI:**
 
-1. State the current ARI and grade in the Intro section.
-2. Show the rough breakdown of contribution by severity (e.g., "14 High threats × avg coverage gap 0.55 ≈ 38.5; 12 Mediums × 0.45 ≈ 16.2; 5 Lows × 0.35 ≈ 4.0; plus applied-residual ≈ 12 = ARI 71").
-3. In the Change Log, record the ARI delta on every refresh.
-4. When proposed redesigns are listed, show their projected ARI deltas (see "Proposed Changes and Redesigns" below).
+1. In the model's Risk Index section, state: **ARI = [X] / 100, Grade [A–F]** (Risk Mass [RM] / Risk Capacity [RC]), noting any severity gate that capped the grade.
+2. Show the breakdown, e.g.: "RC = 78. Open Highs contribute 25 of the 34.1 mass (T9, T13, T14); two partial Highs add 5; the rest is layered or eliminated. ARI = 100 × 34.1 / 78 = 43.7, Grade C — capped at C by two fully-open Highs."
+3. Drive the Prioritized Remediation Backlog from per-threat **residual mass** `severity_weight(T) × gap(T)` — the same term the ARI sums, so the backlog and the grade can never disagree. Note the ARI-point drop each fix yields: `ΔARI ≈ 100 × Δmass / RC`.
+4. In the Change Log, record `ARI: old → new` with the `Δ_scope / Δ_controls` decomposition (below) on every refresh.
+5. When proposed redesigns are listed, project each option's post-change ARI so design options compare on one bounded scale (see "Proposed Changes and Redesigns").
 
-**Per-threat contribution drives the backlog.** Each threat's contribution to the ARI — `severity_weight(T) × coverage_gap(T)` — is also its residual-risk ranking. The Prioritized Remediation Backlog (below) sorts open gaps by exactly this value, so the backlog and the ARI can never disagree. Privacy threats modeled against intangible assets (see "Modeling Privacy") contribute to the ARI exactly like any other threat.
+**Refresh deltas — scope vs. controls.** When the threat set changes between versions, the raw ARI delta conflates *"we got riskier"* with *"we modeled harder."* Separate them: recompute a **pivot** — previous control statuses over the *current* threat set — then report `ΔARI = Δ_scope + Δ_controls`, where `Δ_scope = ARI(pivot) − ARI(previous)` and `Δ_controls = ARI(new) − ARI(pivot)`. A newly discovered but already-guarded threat enters the pivot at the status the code shows at discovery (that is scope, not remediation). See spec §3.2.
 
-**Note on the ARI's standing.** This is a skill-defined metric, not an industry standard (CVSS, OWASP Risk Rating, DREAD all exist and may be more appropriate in some contexts). Its purpose is comparability across versions of the same threat model, not interop with external scoring systems. If the user prefers a standard framework, switch — but keep ONE consistent metric across versions.
+Privacy threats modeled against intangible assets (see "Modeling Privacy") contribute to the ARI exactly like any other threat.
+
+**Note on the ARI's standing.** ARI is a bespoke metric defined by the spec linked above — not an industry standard, and not meant to interoperate with one. Positioning for a skeptical reviewer (per spec §7): *ARI uses OWASP-style Likelihood × Impact severity and ISO 27005 / NIST 800-30 residual-risk thinking, aggregated into a normalized index in the spirit of FAIR — a coverage index for tracking one threat model over time, not an interop-grade or actuarial standard. Score individual findings with CVSS; track posture with ARI.* If the user prefers a standard framework, switch — but keep ONE consistent metric across versions.
 
 ## Prioritized Remediation Backlog
 
@@ -190,12 +235,12 @@ Readers who need to *act* — not study — should be able to open the model, re
 
 **How to build it:**
 
-1. For every threat whose best-available countermeasure status is **⬜ Not Applied** or **⚠️ Partial** (i.e., `coverage_gap > 0.10`), take its residual-risk contribution `severity_weight(T) × coverage_gap(T)` — the same per-threat term used in the ARI.
-2. Sort descending by that contribution. This is the fix order: the work that most reduces the ARI comes first.
-3. For each row, name the specific countermeasure(s) that would close the gap, the threat(s) addressed, the max severity, the current status, the residual contribution, and a rough effort estimate.
-4. Flag **quick wins** — high contribution paired with low effort — explicitly; they are the highest-value work and easy to miss when scanning in ID order.
+1. For every threat still carrying meaningful residual — `gap(T) ≥ 0.20`, i.e., at most one solid control and no elimination — take its **residual mass** `severity_weight(T) × gap(T)`, the same per-threat term the ARI sums.
+2. Sort descending by residual mass. This is the fix order: the work that most reduces the ARI comes first.
+3. For each row, name the specific countermeasure(s) that would close the gap, the threat(s) addressed, the max severity, the current status, the residual mass, the estimated ARI-point drop the fix yields (`ΔARI ≈ 100 × Δmass / RC`), and a rough effort estimate.
+4. Flag **quick wins** — high ΔARI paired with low effort — explicitly; they are the highest-value work and easy to miss when scanning in ID order. Also flag any fix that clears a severity-gate cap: those move the *grade*, not just the number.
 
-Because the ranking is derived from the ARI, the backlog cannot drift out of sync with the grade. Fully-mitigated threats (status ✅, `coverage_gap = 0.10`) are residual-only and are normally omitted from the backlog unless the user asks for the long tail.
+Because the ranking is derived from the ARI's own per-threat terms, the backlog cannot drift out of sync with the grade. Threats at or below `gap = 0.10` (layered or eliminated) are near the residual floor and are normally omitted from the backlog unless the user asks for the long tail.
 
 ## Trust Boundaries and Threat Actors
 
@@ -308,29 +353,26 @@ Working notes: [path to companion notes file, if any]
 
 ## Risk Index and Grading
 
-This threat model uses the Aggregate Risk Index (ARI) defined by the Threat Model Generation Skill v[N].
+This threat model uses the Aggregate Risk Index, spec v[1.1] (https://github.com/kristovatlas/ari), applied via the Threat Model Generation Skill v[N]. ARI is a normalized 0–100 coverage index; **lower is safer**.
 
-**Current score: ARI = [X], Grade [A-F].**
+**Current score: ARI = [X] / 100, Grade [A–F]** (Risk Mass [RM] / Risk Capacity [RC]). [If a severity gate capped the grade, say which: e.g., "Capped at C by two fully-open High threats."]
 
 Breakdown:
-- [N] High-severity threats × average coverage gap [X] ≈ [contribution]
-- [N] Medium-severity threats × average coverage gap [X] ≈ [contribution]
-- [N] Low-severity threats × average coverage gap [X] ≈ [contribution]
-- Applied-residual: ≈ [contribution]
+- [e.g., "RC = 78. Open Highs contribute 25 of the 34.1 mass (T9, T13, T14); two partial Highs add 5; the rest is layered or eliminated. ARI = 100 × 34.1 / 78 = 43.7, Grade C — capped at C by two fully-open Highs."]
 
-[1-3 sentences identifying which threats dominate the score and which countermeasures would most efficiently move the grade.]
+[1-3 sentences identifying which threats dominate the residual mass and which countermeasures would most efficiently move the score — consistent with the backlog below.]
 
 ## Prioritized Remediation Backlog
 
-[The quick to-do list. Every open gap — threats whose best countermeasure is ⬜ Not Applied or ⚠️ Partial — ranked by residual-risk contribution `severity_weight × coverage_gap` (the same per-threat term that feeds the ARI), highest first. Fully-mitigated (✅) threats are omitted unless the long tail is requested.]
+[The quick to-do list. Every threat with meaningful residual (`gap ≥ 0.20`) ranked by residual mass `severity_weight × gap` — the same per-threat term the ARI sums — highest first. `ΔARI ≈ 100 × Δmass / RC` estimates the score improvement each fix yields. Layered or eliminated threats (`gap ≤ 0.10`) are omitted unless the long tail is requested.]
 
-| **Rank** | **Fix (Countermeasure)** | **Closes** | **Max Severity** | **Status** | **Residual Contribution** | **Effort** |
-| --- | --- | --- | --- | --- | --- | --- |
-| 1 | (C#) [Countermeasure] | • (T#) [Threat] | High | ⬜ Not Applied | 5.0 | [S / M / L] |
-| 2 | (C#) [Countermeasure] | • (T#) [Threat]<br>• (T#) [Threat] | High | ⚠️ Partial | 2.5 | [S / M / L] |
-| ... | ... | ... | ... | ... | ... | ... |
+| **Rank** | **Fix (Countermeasure)** | **Closes** | **Max Severity** | **Status** | **Residual Mass** | **ΔARI if Fixed** | **Effort** |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | (C#) [Countermeasure] | • (T#) [Threat] | High | ⬜ Not Applied | 5.0 | −[X.X] | [S / M / L] |
+| 2 | (C#) [Countermeasure] | • (T#) [Threat]<br>• (T#) [Threat] | High | ⚠️ Partial | 2.5 | −[X.X] | [S / M / L] |
+| ... | ... | ... | ... | ... | ... | ... | ... |
 
-[1-2 sentences calling out the quick wins (high contribution, low effort) and the single highest-leverage fix.]
+[1-2 sentences calling out the quick wins (high ΔARI, low effort), the single highest-leverage fix, and any fix that clears a severity-gate grade cap.]
 
 ## UI
 
@@ -378,7 +420,7 @@ If no proposed changes are known, write "No proposed changes are currently under
 
 ## (A1) [Asset Title]
 
-[2-4 sentences describing what this asset is, why an attacker would target it, and any special considerations (e.g., data sensitivity, blast radius of compromise). End with the value rating and a one-sentence justification. Intangible assets follow the same format — describe the harm their loss causes.]
+[2-4 sentences, in plain language per Write for Human Readers, describing what this asset is, why an attacker would target it, and any special considerations (e.g., data sensitivity, blast radius of compromise). Name the asset in domain terms, not by its code identifier. End with the value rating and a one-sentence justification. Intangible assets follow the same format — describe the harm their loss causes.]
 
 As [justification], the value is rated **[Value]**.
 
@@ -403,7 +445,7 @@ Severity matrix:
 
 ## (T1) [Threat Title]
 
-[2-4 sentences explaining the attack vector, how it would be carried out against THIS specific application, and what the attacker gains. Reference specific code patterns, endpoints, or configurations you observed. If this threat is introduced by proposed changes, mark it with "(New)".]
+[2-4 sentences, in plain language per Write for Human Readers, explaining the attack vector, how it would be carried out against THIS specific application, and what the attacker gains. Ground it in the concrete behavior, interface, or configuration you observed — described in system terms (no file paths, function names, or line numbers). If this threat is introduced by proposed changes, mark it with "(New)".]
 
 Crosses: (TB1) [Boundary name]
 Actor(s): (TA1) [Actor name]
@@ -423,18 +465,20 @@ Assets Impacted:
 | C1 | [Countermeasure Name] | • (T1) [Threat Name] | ✅ Applied |
 | C2 | [Countermeasure Name] | • (T1) [Threat Name]<br>• (T3) [Threat Name] | ⬜ Not Applied |
 | C3 | [Countermeasure Name] | • (T2) [Threat Name] | ⚠️ Partial |
+| C4 | [Countermeasure Name] | • (T4) [Threat Name] | 🚫 Eliminated |
 | ... | ... | ... | ... |
 
-Status values:
-- **✅ Applied**: Evidence found in the codebase. Cite the relevant file(s) or configuration in the subsection.
+Status values (these are the ARI effectiveness anchors — see the skill's Risk Index section):
+- **🚫 Eliminated**: The attack surface or asset was designed out entirely — removed, not guarded (deleted key, dropped endpoint, cut data field). Describe what was removed and cite the commit or PR that removed it, where identifiable. This is the only status that zeroes a threat's coverage gap; reserve it for genuine removal, never for a strong mitigation.
+- **✅ Applied**: Evidence found in the codebase. Describe the evidence in system terms in the subsection — which component enforces it and what behavior you verified — and cite the commit or PR that introduced the control, where identifiable.
 - **⬜ Not Applied**: No evidence found. The subsection should include implementation guidance.
 - **⚠️ Partial**: Some aspects are implemented but gaps remain. The subsection should describe what's in place and what's missing.
 
 ## (C1) [Countermeasure Title]
 
-**Status**: [✅ Applied / ⬜ Not Applied / ⚠️ Partial]
+**Status**: [🚫 Eliminated / ✅ Applied / ⬜ Not Applied / ⚠️ Partial][ · e = [X]% — [one-line justification; only when overriding the status's default effectiveness, per the skill's justified-effectiveness rules. A custom value with no rationale is invalid.]]
 
-[If Applied: 1-2 sentences citing where in the codebase this is implemented.]
+[If Applied: 1-2 sentences describing the evidence — which component enforces this and what behavior you verified. System terms per Write for Human Readers; no file paths or line numbers. Cite the commit or PR that introduced or verified the control, where identifiable — e.g., "(added in PR #142)".]
 
 [If Not Applied or Partial: 2-5 sentences describing what should be done, why it mitigates the listed threats, and implementation guidance specific to this codebase. Be concrete and actionable.]
 
@@ -498,11 +542,11 @@ LINDDUN is a privacy-focused threat modeling framework that complements STRIDE's
 This document is intended to be refreshed iteratively rather than rewritten. Before substantive edits, follow these conventions:
 
 1. **Re-anchor to a code commit.** Update the Codebase Snapshot in the intro to the then-current commit hash and record the date of the refresh.
-2. **Re-compute the ARI** and report the delta vs. the previous version in the Change Log.
-3. **Re-rank the Prioritized Remediation Backlog** from the updated per-threat ARI contributions, so the to-do list stays consistent with the grade.
+2. **Re-compute the ARI** (per the ARI spec version cited in the footer; check https://github.com/kristovatlas/ari for updates) and report the delta vs. the previous version in the Change Log with its `Δ_scope / Δ_controls` decomposition — recompute a pivot when the threat set changed.
+3. **Re-rank the Prioritized Remediation Backlog** from the updated per-threat residual masses, so the to-do list stays consistent with the grade.
 4. **Re-check Trust Boundaries and Threat Actors.** New integrations or entry points usually add a boundary or an actor; ensure each remains wired to ≥1 threat, and each threat still cites its boundary and actor.
 5. **Re-tag the Brainstorming Appendix.** Every STRIDE/LINDDUN bullet must still carry a resolving disposition tag.
-6. **Add `(New — Month Year)` markers** to every new asset, threat, and countermeasure per the incremental update workflow. Strike through retired entries; never delete.
+6. **Add `(New — Month Year)` markers** to every new asset, threat, and countermeasure per the incremental update workflow. Strike through retired entries; never delete — deleting mitigated entries shrinks Risk Capacity and perversely raises the ARI (retention is a scoring requirement).
 7. **Cross-check redesign impact.** When the user mentions a redesign, evaluate which threats it changes status on and which it introduces, and update the ARI accordingly. Present projected ARI alongside current ARI in the Proposed Changes and Redesigns section.
 8. **Validate cross-references** before delivering (see Cross-Reference Validation in the skill).
 9. **Bump the doc version** in the header on every substantive edit. Skill version is separate from doc version.
@@ -519,12 +563,13 @@ This document is intended to be refreshed iteratively rather than rewritten. Bef
 
 | **Date** | **Author / Trigger** | **ARI Δ** | **Summary of Changes** |
 | --- | --- | --- | --- |
-| [Month Year] | [What prompted the update] | [ARI before → after] | Added A10, A11. Added T7, T8. Updated T3 severity from Medium to High. Added C14, C15. Retired T2. |
+| [Month Year] | [What prompted the update] | [old] → [new] (Δ_scope [±X.X] / Δ_controls [±X.X]) | Added A10, A11. Added T7, T8. Updated T3 severity from Medium to High. Added C14, C15. Retired T2. |
 | [Previous date] | [Previous trigger] | [Previous delta] | [Previous summary] |
 
 # Model and Methodology
 
 - Skill: Threat Model Generation Skill v[N]
+- ARI spec: v[1.1] — https://github.com/kristovatlas/ari
 - Model used: [actual model that produced this analysis, e.g., claude-opus-4-8]
 - Model degradation: [None — ran on the intended top choice. | Intended [model] but ran on [model] because [reason, e.g., "Fable 5 degraded to Opus 4.8 on cyber content"].]
 - Generated / refreshed: [Month Year]
@@ -567,7 +612,7 @@ Examples of assets include: database records, source code, non-financial PII (em
 ### Threat Actors
 
 - Derive actors from the boundaries: for each boundary, who sits on the untrusted side, and what can they do? That yields the actor list without inventing movie-villain personas.
-- State capability concretely (e.g., "can land a PR into `src/data/content/**`", "controls the origin serving the base URL", "can edit `mcp.json` in a shared devcontainer"), not vaguely ("a hacker").
+- State capability concretely (e.g., "can get a pull request merged into the site's content directory", "controls the server behind the configured content URL", "can edit the tool-configuration file in a shared development container"), not vaguely ("a hacker").
 - An actor with no capability against any boundary does not belong in the model. Each actor must drive ≥1 threat, and its capability should justify the Likelihood of the threats it drives.
 
 ### Threats
@@ -584,11 +629,14 @@ Examples of assets include: database records, source code, non-financial PII (em
 ### Countermeasures
 
 - **Every threat must have at least one countermeasure.** Most countermeasures mitigate multiple threats.
-- Be specific and actionable. Reference actual files, functions, libraries, or configurations in the codebase.
+- Be specific and actionable — but in system terms: name the component, behavior, library, or configuration involved, so a reader can follow it without opening the codebase (see Write for Human Readers).
 - Include both preventive (stop the attack) and detective (notice the attack) countermeasures where appropriate.
 - Suggest specific tools or libraries where relevant (e.g., `socket.dev` for dependency scanning, `helmet` for Express headers, OpenZeppelin `TimelockController` for on-chain admin throttling).
 - For privacy threats, countermeasures are often procedural or documentary (a retention policy, a lawful-basis record, a DPIA, a privacy notice, a deletion job) as much as technical. They are tracked and scored exactly like technical countermeasures and appear in the backlog.
 - **Verify implementation status.** For each countermeasure, search the codebase for evidence that it has been applied. This is one of the most valuable outputs of the threat model — a clear picture of what's protected and what's exposed.
+- **Prefer elimination over mitigation where feasible.** Removing a surface (🚫 Eliminated) is categorically stronger than guarding it and is the only status that zeroes a threat's gap. When a control seems ~100% effective, ask whether the surface can simply be removed.
+- **List only independent layers.** Controls sharing a failure mode (same key, platform, library, or human approver) count as one for ARI purposes — note the correlation rather than claiming defense-in-depth.
+- **Justified effectiveness values need written rationale.** Where a control's real coverage sits between the status anchors, record `e = [X]% — [reason]` in its subsection per the Risk Index section's rules; otherwise use the status default.
 
 ### LINDDUN Analysis
 
@@ -650,6 +698,7 @@ Adapt the threat model to the domain of the system being analyzed. Consult the r
 ### General Quality Standards
 
 - **No generic filler.** Every sentence should convey information specific to the application being analyzed.
+- **Write for human readers.** Plain language; scant code references (never line numbers; avoid file paths and function names); acronyms and tools glossed on first use; concepts named in prose, not by code identifiers. See Write for Human Readers.
 - **Cross-reference consistently.** Asset IDs (A1, A2...), Trust Boundary IDs (TB1, TB2...), Threat Actor IDs (TA1, TA2...), Threat IDs (T1, T2...), and Countermeasure IDs (C1, C2...) must be used consistently across all tables and subsections. Every STRIDE/LINDDUN bullet carries a disposition tag.
 - **Justify ratings.** Every Low/Medium/High/Critical rating needs a brief rationale grounded in the actual system.
 - **Acknowledge uncertainty.** If you cannot determine something from the code alone (e.g., network configuration, cloud IAM policies), say so explicitly rather than guessing.
@@ -666,13 +715,16 @@ Before delivering or refreshing a threat model, walk through this checklist:
 4. Confirm no orphaned IDs exist (referenced in tables but missing subsections, or vice versa).
 5. Confirm all `(New — [Month Year])` and `(Retired — [Month Year])` markers include the date.
 6. Confirm the countermeasure status table is accurate against the current codebase.
-7. Confirm the ARI score in the intro matches what the threat/countermeasure tables imply.
+7. Confirm the ARI in the intro matches what the threat/countermeasure tables imply: recompute RM and RC, apply multiplicative gap combining and the 0.03 floor, and check the grade (band plus any triggered severity-gate caps).
 8. Confirm the Codebase Snapshot in the intro reflects the actual code analyzed.
 9. Walk every trust boundary TB1..TBn and confirm ≥1 threat crosses it; walk every actor TA1..TAn and confirm ≥1 threat names it.
 10. Confirm every threat subsection cites a boundary (TB#) and at least one actor (TA#).
 11. Confirm every STRIDE and LINDDUN bullet carries a disposition tag, and every `[→ T#]` / `[→ OQ#]` resolves to a real entry.
 12. Confirm every intangible asset is targeted by ≥1 threat — privacy assets are not exempt from the asset → threat rule.
-13. Confirm the Prioritized Remediation Backlog lists every open (⬜/⚠️) gap, is sorted by residual contribution, and its ordering matches the ARI per-threat contributions.
+13. Confirm the Prioritized Remediation Backlog lists every threat with `gap ≥ 0.20`, is sorted by residual mass, and its ΔARI estimates are consistent with the model's RC.
+14. Confirm every justified effectiveness override carries a written rationale (a bare custom `e` is invalid), and every 🚫 Eliminated status reflects genuine removal of the surface, not a strong mitigation.
+15. Confirm controls listed together on a threat are actually independent (no shared key, platform, library, or approver), and that retired entries are retained with strikethrough rather than deleted (deletion shrinks Risk Capacity and skews the ARI).
+16. Read Assets, Threats, and Countermeasures as a reader with no codebase access: no line numbers or file paths, no function/class names, no unglossed acronyms or tool names, concepts named in prose rather than raw identifiers, and every sentence passes the no-lookup test (see Write for Human Readers). Commit hashes and PR numbers cited as closure evidence are exempt — and encouraged: check that Applied / Eliminated / Retired entries carry one where identifiable.
 
 Skipping this validation produces broken models that lose credibility on the first careful read.
 
@@ -716,7 +768,7 @@ Before modifying anything, understand what changed:
 ### Step 3: Update Threats
 
 - **New threats**: Next available ID. Mark with **(New — [Month Year])**. Ensure ≥1 asset, ≥1 countermeasure, and a cited boundary (TB#) and actor (TA#).
-- **Retired threats**: Strike through; note retirement reason.
+- **Retired threats**: Strike through; note retirement reason and cite the commit or PR that closed it, where identifiable.
 - **Modified threats**: Update description, re-evaluate Likelihood/Impact/Severity, and re-confirm the boundary/actor citation. Note severity changes.
 - **Re-evaluate existing threats**: Even threats not directly affected may shift.
 
@@ -725,7 +777,8 @@ Before modifying anything, understand what changed:
 - **New countermeasures**: Next available ID. Link to threats they mitigate.
 - **Retired countermeasures**: Strike through; note reason.
 - **Modified countermeasures**: Update implementation guidance.
-- **Re-evaluate status**: Check whether previously unapplied countermeasures have been implemented, or whether applied countermeasures have been removed.
+- **Re-evaluate status**: Check whether previously unapplied countermeasures have been implemented, or whether applied countermeasures have been removed. Record the commit or PR evidencing each status change, where identifiable.
+- **Reclassify eliminations**: Where a change removed an attack surface outright (deleted key, dropped endpoint, cut data field), mark the control 🚫 Eliminated rather than ✅ Applied — citing the removing commit or PR — and re-run the independence check on any threat listing multiple controls.
 
 ### Step 5: Update Trust Boundaries and Threat Actors
 
@@ -739,16 +792,17 @@ Re-examine both analyses in the Brainstorming Appendix. Add new scenarios, retir
 ### Step 7: Update Codebase Snapshot, Re-compute ARI, Re-rank Backlog
 
 - Update the Codebase Snapshot in the intro to the current commit/date.
-- Re-compute ARI from the updated tables.
-- Re-rank the Prioritized Remediation Backlog from the updated per-threat contributions.
-- Note the ARI delta (old → new) in the Change Log.
+- Re-compute ARI from the updated tables. If the threat set changed, also compute the **pivot** (previous control statuses over the current threat set) and decompose the delta into `Δ_scope` and `Δ_controls` (see Risk Index and Grading).
+- **If the prior model was scored under ARI spec v1.0** (any model generated by skill v6 or earlier — recognizable by an additive un-normalized score with grade bands like "≤ 15 = A"), the scores are **not comparable**: recompute from scratch under the current spec, record `Metric migrated v1.0 → v1.1; scores rebased, prior deltas not carried forward` in the Change Log, reclassify any surface-removing ✅ controls as 🚫 Eliminated, and run the independence check on threats listing multiple controls.
+- Re-rank the Prioritized Remediation Backlog from the updated per-threat residual masses.
+- Note the ARI delta (old → new, with decomposition) in the Change Log.
 
 ### Step 8: Add a Change Log Entry
 
 Append to the `# Change Log` table at the bottom:
 
 ```markdown
-| [Month Year] | [What prompted the update, e.g., "AI features merged (PR #142)"] | [old ARI] → [new ARI] | Added A10, A11. Added T7, T8. Updated T3 severity from Medium to High. Added C14, C15. Retired T2. |
+| [Month Year] | [What prompted the update, e.g., "AI features merged (PR #142)"] | [old] → [new] (Δ_scope [±X.X] / Δ_controls [±X.X]) | Added A10, A11. Added T7, T8. Updated T3 severity from Medium to High. Added C14, C15. Retired T2. |
 ```
 
 ### Step 9: Validate Cross-References
@@ -776,9 +830,9 @@ When retiring a threat:
 ```markdown
 ## (T2) ~~AI Prompt Injection~~
 
-**Retired Nov 2025**: AI features were removed in v2.4 after cost-benefit review.
-The OpenRouter integration and all AI summarization code have been deleted. This
-threat no longer applies.
+**Retired Nov 2025**: AI features were removed in v2.4 (PR #88) after cost-benefit
+review. The OpenRouter integration and all AI summarization code have been deleted.
+This threat no longer applies.
 ```
 
 ---
@@ -789,7 +843,7 @@ A threat model is not a security audit, a penetration test, or a checklist of vu
 
 When in doubt, prefer:
 - Fewer, more credible threats over many speculative ones
-- Specific code references over abstract concerns
+- Specific observed behavior over abstract concerns — described in system terms, not code coordinates
 - Honest acknowledgment of uncertainty over confident-sounding guesses
 - Comparable metrics across refreshes (ARI) over one-shot heroics
 
