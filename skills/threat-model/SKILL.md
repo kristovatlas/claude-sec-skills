@@ -11,7 +11,7 @@ Version: 8
 When changes are made to this document by an agent, please bump the version number.
 
 **Notable changes since v7:**
-- **Two-layer element format — fixes a v7 over-correction.** v7's "scant code references" rule exiled all precise pointers to a non-deliverable working-notes file. In practice this vaguened the prose and lost actionable substance: specific findings collapsed into generic threats, the human reader gained nothing (they skim the narrative anyway), and automated auditors had to re-discover what each vague claim referred to. The real split is **narrative vs. index, not human vs. LLM**. Every Asset, Threat, and Countermeasure now carries a mandatory **Plain-language** block (v7's discipline unchanged: durable names only, no code coordinates) plus an optional, strictly additive **Technical detail** block with four labeled fields — **Anchors** (re-resolvable pointers; file paths and function/procedure names permitted here; line numbers banned everywhere), **Mechanism** (the precise code-level why), **Provenance** ("observed at `<commit>`"; commit/PR for control status changes), and **Verification** (what to read or grep). Two guardrails: anti-duplication (technical detail supplements, never restates, the plain claim) and anchoring bias (no present-tense findings — Mechanism is an observation at the stated provenance; anchors and verification say where to look, not what to conclude).
+- **Two-layer element format — fixes a v7 over-correction.** v7's "scant code references" rule exiled all precise pointers to a non-deliverable working-notes file. In practice this vaguened the prose and lost actionable substance: specific findings collapsed into generic threats, the human reader gained nothing (they skim the narrative anyway), and automated auditors had to re-discover what each vague claim referred to. The real split is **narrative vs. index, not human vs. LLM**. Every Asset, Threat, and Countermeasure now carries a mandatory **Plain-language** block (v7's discipline unchanged: durable names only, no code coordinates) plus an optional, strictly additive **Technical detail** block with four labeled fields — **Anchors** (re-resolvable pointers; file paths and function/procedure names permitted here; line numbers banned everywhere), **Mechanism** (the precise code-level why), **Provenance** ("observed at `<commit>`", or the fallback snapshot identifier when git history is unavailable; commit/PR for control status changes), and **Verification** (what to read or grep). Two guardrails: anti-duplication (technical detail supplements, never restates, the plain claim) and anchoring bias (no present-tense findings — Mechanism is an observation at the stated provenance; anchors and verification say where to look, not what to conclude).
 - **Dual-use preamble.** The AI-notice now states the document is both a human reasoning aid and a seed for automated audit, and instructs automated readers to (1) confirm each anchor still resolves — a rename/move is a staleness signal, re-find by symbol; (2) verify every claim from code; (3) hunt beyond the listed items — absence implies nothing.
 - **Working-notes file demoted** back to a true scratchpad for raw observations and pending questions; load-bearing anchors now live in the deliverable's Technical-detail layer.
 - **Open Questions doubles as a Coverage & Unknowns map** — examined vs. not-examined areas plus every "could not verify" claim — so any reader can see where the prior pass stopped and where novel discovery is most needed.
@@ -426,6 +426,8 @@ Breakdown:
 | TB1 | [Zone A ↔ Zone B] | [What each side trusts the other to provide] | [Why it matters; what is or isn't enforced at the crossing] |
 | TB2 | ... | ... | ... |
 
+[Optional — where code-level detail genuinely helps, add a compact Technical-detail sub-list beneath this table, keyed by boundary ID (e.g., "TB1 — Anchors: …; Provenance: …"). Table cells stay plain-language.]
+
 ## Threat Actors
 
 [Enumerate who could attack the system and the capability each holds. An actor with no capability against any boundary should not appear. Every actor must drive at least one threat below.]
@@ -434,6 +436,8 @@ Breakdown:
 | --- | --- | --- | --- |
 | TA1 | [Actor] | [What they can do] | [TB# → A#, A#] |
 | TA2 | ... | ... | ... |
+
+[Optional — where code-level detail genuinely helps, add a compact Technical-detail sub-list beneath this table, keyed by actor ID. Table cells stay plain-language.]
 
 ## Proposed Changes and Redesigns
 
@@ -501,7 +505,7 @@ Assets Impacted:
 
 **Technical detail:** [optional, additive — omit for pure governance/privacy threats; never a jargon restatement of the plain claim]
 - Anchors: [re-resolvable pointers: RPC procedure names, route paths, model/table names, env vars, config keys, file paths, function/procedure names — no line numbers]
-- Mechanism: [the exact missing check, the specific data flow, or the concrete condition — stated as observed at the stated provenance, not a present-tense verdict]
+- Mechanism: [the exact missing check, the specific data flow, or the concrete condition — phrased as what was observed at the stated provenance, not a present-tense verdict]
 - Provenance: [observed at `<commit>`, or the fallback snapshot identifier when git history is unavailable]
 - Verification: [what to read or grep to confirm — where to look, not what to conclude]
 
