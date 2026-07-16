@@ -11,7 +11,7 @@ Version: 8
 When changes are made to this document by an agent, please bump the version number.
 
 **Notable changes since v7:**
-- **Two-layer element format — fixes a v7 over-correction.** v7's "scant code references" rule exiled all precise pointers to a non-deliverable working-notes file. In practice this vaguened the prose and lost actionable substance: specific findings collapsed into generic threats, the human reader gained nothing (they skim the narrative anyway), and automated auditors had to re-discover what each vague claim referred to. The real split is **narrative vs. index, not human vs. LLM**. Every Asset, Threat, and Countermeasure now carries a mandatory **Plain-language** block (v7's discipline unchanged: durable names only, no code coordinates) plus an optional, strictly additive **Technical detail** block with four labeled fields — **Anchors** (re-resolvable pointers; file paths and function/procedure names permitted here; line numbers banned everywhere), **Mechanism** (the precise code-level why), **Provenance** ("observed at `<commit>`"; commit/PR for control status changes), and **Verification** (what to read or grep). Two guardrails: anti-duplication (technical detail supplements, never restates, the plain claim) and anchoring bias (verification targets + provenance, not conclusions).
+- **Two-layer element format — fixes a v7 over-correction.** v7's "scant code references" rule exiled all precise pointers to a non-deliverable working-notes file. In practice this vaguened the prose and lost actionable substance: specific findings collapsed into generic threats, the human reader gained nothing (they skim the narrative anyway), and automated auditors had to re-discover what each vague claim referred to. The real split is **narrative vs. index, not human vs. LLM**. Every Asset, Threat, and Countermeasure now carries a mandatory **Plain-language** block (v7's discipline unchanged: durable names only, no code coordinates) plus an optional, strictly additive **Technical detail** block with four labeled fields — **Anchors** (re-resolvable pointers; file paths and function/procedure names permitted here; line numbers banned everywhere), **Mechanism** (the precise code-level why), **Provenance** ("observed at `<commit>`"; commit/PR for control status changes), and **Verification** (what to read or grep). Two guardrails: anti-duplication (technical detail supplements, never restates, the plain claim) and anchoring bias (no present-tense findings — Mechanism is an observation at the stated provenance; anchors and verification say where to look, not what to conclude).
 - **Dual-use preamble.** The AI-notice now states the document is both a human reasoning aid and a seed for automated audit, and instructs automated readers to (1) confirm each anchor still resolves — a rename/move is a staleness signal, re-find by symbol; (2) verify every claim from code; (3) hunt beyond the listed items — absence implies nothing.
 - **Working-notes file demoted** back to a true scratchpad for raw observations and pending questions; load-bearing anchors now live in the deliverable's Technical-detail layer.
 - **Open Questions doubles as a Coverage & Unknowns map** — examined vs. not-examined areas plus every "could not verify" claim — so any reader can see where the prior pass stopped and where novel discovery is most needed.
@@ -62,7 +62,7 @@ This persona governs the **analysis** — what to examine, how skeptically, and 
 
 The generated model is **dual-use**: a reasoning aid for humans skimming for decisions, and a seed/index for automated (LLM-driven) security audits. Serve both by **layering each element — never by vaguening the prose**. A vague claim ("one read path lacks an ownership check") fails both readers at once: the human gets nothing more from it than from a specific claim, and the automated auditor must re-discover what it refers to.
 
-Every substantive element — each Asset, Threat, and Countermeasure (Trust Boundaries and Threat Actors may adopt the same split where useful) — carries:
+Every substantive element — each Asset, Threat, and Countermeasure — carries the two layers below. (Trust Boundaries and Threat Actors are table-driven: keep their table cells plain-language; where code-level detail genuinely helps, add a compact Technical-detail sub-list beneath the table, keyed by `TB#`/`TA#` ID.)
 
 ### Layer 1: Plain-language (mandatory)
 
@@ -79,23 +79,25 @@ The durable claim, in prose a non-coder understands. For a threat: what could go
 Present only when there is genuine code-level substance — a pure governance/privacy threat may omit it. It must never restate the claim in jargon: it adds only what the plain layer deliberately left out, as four labeled fields:
 
 - **Anchors** — the re-resolvable pointers: RPC procedure names, route paths, model/table names, env vars, config keys, file paths, and internal function/procedure names are permitted here. **Line numbers are banned everywhere, including here** — they break on any unrelated edit.
-- **Mechanism** — the precise code-level why: the exact missing check, the specific data flow, the concrete condition. This is the actionable substance a plain summary necessarily omits.
-- **Provenance** — "observed at `<commit>`," so any reader knows what version the anchor and mechanism were true against. For countermeasures, cite the commit/PR that applied or eliminated the control (extends the closure-evidence practice to all anchors).
+- **Mechanism** — the precise code-level why: the exact missing check, the specific data flow, the concrete condition. This is the actionable substance a plain summary necessarily omits. State it as an observation bound to the stated provenance — "at `<commit>`, issuance included no nonce" — never as a present-tense verdict about today's code.
+- **Provenance** — "observed at `<commit>`," so any reader knows what version the anchor and mechanism were true against. One stamp per block when everything was observed together; per-anchor stamps when observations span commits (e.g., after a partial refresh). For countermeasures, cite the commit/PR that applied or eliminated the control (extends the closure-evidence practice to all anchors). When git history is unavailable, use the documented fallback snapshot identifier (archive name + mtime; see Codebase Snapshot) in place of a commit.
 - **Verification** — how to confirm it from code: what to read or grep. Phrase anchors as *where to look*, not *what to conclude*.
 
 **Two guardrails:**
 
 - **Anti-duplication.** The technical detail is a supplement, not a translation. If a technical block merely re-explains the plain claim, delete it. One claim, stated once, in the plain layer.
-- **Anchoring bias.** The technical layer is verification targets + provenance, not conclusions. It must not read as "here is the confirmed bug at X" — an automated reader must verify from code, not inherit findings.
+- **Anchoring bias.** The technical layer must not read as "here is the confirmed bug at X" — an automated reader must verify from code, not inherit findings. Anchors and Verification say *where to look*, never *what to conclude*; Mechanism records *what was observed at the stated provenance*, which may no longer hold. Nothing in the block asserts a present-tense finding.
 
 Grounding is unchanged: every claim in either layer must derive from code you actually read (see Prerequisites), and the Codebase Snapshot anchors what the claims were true against.
+
+All narrative prose outside element subsections — Intro, Details, UI, backlog rows, trust-boundary and actor tables, STRIDE/LINDDUN bullets — follows the Layer-1 rules. Technical-detail blocks are the only home for code coordinates anywhere in the document.
 
 Example (invented):
 
 - **Plain-language:** "Login tokens can be replayed: a captured token can be reused to impersonate its owner, because the login service does not bind tokens to a one-time value."
 - **Technical detail:**
   - Anchors: token issuance and validation in the auth service (`auth/tokens.py` — `session_mint`, `session_validate`).
-  - Mechanism: issuance signs the session payload but includes no nonce or single-use counter, so an intercepted token passes validation any number of times until expiry.
+  - Mechanism: at `9f3c2a1`, issuance signed the session payload with no nonce or single-use counter, so an intercepted token passed validation any number of times until expiry.
   - Provenance: observed at `9f3c2a1`.
   - Verification: read the token issuance and validation paths; grep the auth service for nonce/jti or replay-cache handling.
 
@@ -179,7 +181,7 @@ If the existing model pre-dates v6, bring it forward incrementally: add the Trus
 
 If the existing model's ARI was computed under spec v1.0 (any model generated by skill v6 or earlier), the score must be **rebased** under the current spec on the next refresh — v1.0 and v1.1 scores are not comparable (see Incremental Update Workflow, Step 7).
 
-If the existing model pre-dates v8, on refresh: split each element subsection into the Plain-language + optional Technical-detail format (recovering any precise anchors from the working-notes file into the Technical-detail layer, with fresh provenance stamps), replace the NOTICE block with the current canonical text (v8 added the dual-use clause and automated-reader instructions), and add the Coverage & Unknowns map. The ARI does not change — v7 and v8 use the same spec v1.1, so scores carry forward. Record each structural change as a Change Log line.
+If the existing model pre-dates v8, on refresh: split each element subsection into the Plain-language + optional Technical-detail format (recovering any precise anchors from the working-notes file into the Technical-detail layer, with fresh provenance stamps), replace the NOTICE block with the current canonical text (v8 added the dual-use clause and automated-reader instructions), and add the Coverage & Unknowns map. For a model already scored under ARI spec v1.1 (i.e., generated by skill v7), the ARI carries forward unchanged — the two-layer format is presentation only. A model scored under v1.0 (skill v6 or earlier) still requires the rebase described above; the format migration does not exempt it. Record each structural change as a Change Log line.
 
 ## Working Notes File
 
@@ -363,7 +365,7 @@ This document is **dual-use**: a reasoning aid for human readers and a seed for 
 
 ## If you are an automated reader
 
-1. **Confirm each anchor still resolves.** Technical-detail anchors were true at their stated provenance commit; a renamed or moved symbol is a staleness signal — re-find it by symbol before concluding anything about it.
+1. **Confirm each anchor still resolves.** Technical-detail anchors were true at their stated provenance (a commit, or a fallback snapshot identifier); a renamed or moved symbol is a staleness signal — re-find it by symbol before concluding anything about it.
 2. **Verify every claim from the code.** Anchors and mechanisms are where to look, not what to conclude.
 3. **Hunt beyond the listed items.** Absence from this document implies nothing. The Coverage & Unknowns map (in Open Questions) shows where prior passes stopped — that is where novel discovery is most needed.
 
@@ -463,8 +465,8 @@ As [justification], the value is rated **[Value]**.
 
 **Technical detail:** [optional, additive — include only when there is code-level substance the plain layer omits]
 - Anchors: [re-resolvable pointers: model/table names, routes, config keys, file paths, function/procedure names — no line numbers]
-- Mechanism: [code-level specifics of where and how this asset lives or is exposed]
-- Provenance: [observed at `<commit>`]
+- Mechanism: [code-level specifics of where and how this asset lives or is exposed, as observed at the stated provenance]
+- Provenance: [observed at `<commit>`, or the fallback snapshot identifier when git history is unavailable]
 - Verification: [what to read or grep to confirm]
 
 [Repeat for each asset.]
@@ -499,8 +501,8 @@ Assets Impacted:
 
 **Technical detail:** [optional, additive — omit for pure governance/privacy threats; never a jargon restatement of the plain claim]
 - Anchors: [re-resolvable pointers: RPC procedure names, route paths, model/table names, env vars, config keys, file paths, function/procedure names — no line numbers]
-- Mechanism: [the exact missing check, the specific data flow, or the concrete condition]
-- Provenance: [observed at `<commit>`]
+- Mechanism: [the exact missing check, the specific data flow, or the concrete condition — stated as observed at the stated provenance, not a present-tense verdict]
+- Provenance: [observed at `<commit>`, or the fallback snapshot identifier when git history is unavailable]
 - Verification: [what to read or grep to confirm — where to look, not what to conclude]
 
 [Repeat for each threat.]
@@ -531,8 +533,8 @@ Status values (these are the ARI effectiveness anchors — see the skill's Risk 
 
 **Technical detail:** [optional, additive — include only when there is code-level substance the plain layer omits]
 - Anchors: [where the control lives or should live: routes, middleware/component names, config keys, file paths, function/procedure names — no line numbers]
-- Mechanism: [how the control works at code level; the precise gap if Partial; what to build if Not Applied]
-- Provenance: [commit/PR that applied or eliminated the control; otherwise observed at `<commit>`]
+- Mechanism: [how the control works at code level (as observed at the stated provenance); the precise gap if Partial; what to build if Not Applied]
+- Provenance: [commit/PR that applied or eliminated the control; otherwise observed at `<commit>`, or the fallback snapshot identifier when git history is unavailable]
 - Verification: [how to confirm the status from code — what to read or grep]
 
 Threats Mitigated:
@@ -601,7 +603,7 @@ This document is intended to be refreshed iteratively rather than rewritten. Bef
 7. **Cross-check redesign impact.** When the user mentions a redesign, evaluate which threats it changes status on and which it introduces, and update the ARI accordingly. Present projected ARI alongside current ARI in the Proposed Changes and Redesigns section.
 8. **Validate cross-references** before delivering (see Cross-Reference Validation in the skill).
 9. **Bump the doc version** in the header on every substantive edit. Skill version is separate from doc version.
-10. **Re-verify Technical-detail anchors.** On refresh, confirm each anchor still resolves at the new snapshot; update renamed or moved anchors (re-find by symbol) and re-stamp their provenance.
+10. **Re-verify Technical-detail anchors.** On refresh, confirm each anchor still resolves at the new snapshot; update renamed or moved anchors (re-find by symbol) and re-stamp provenance — moving to per-anchor stamps if the block's observations now span commits.
 11. **Refresh the Coverage & Unknowns map** to reflect what this pass examined, what remains unexamined, and what still could not be verified from code.
 
 # Open Questions for the Team
@@ -785,11 +787,11 @@ Before delivering or refreshing a threat model, walk through this checklist:
 13. Confirm the Prioritized Remediation Backlog lists every threat with `gap ≥ 0.20`, is sorted by residual mass, and its ΔARI estimates are consistent with the model's RC.
 14. Confirm every justified effectiveness override carries a written rationale (a bare custom `e` is invalid), and every 🚫 Eliminated status reflects genuine removal of the surface, not a strong mitigation.
 15. Confirm controls listed together on a threat are actually independent (no shared key, platform, library, or approver), and that retired entries are retained with strikethrough rather than deleted (deletion shrinks Risk Capacity and skews the ARI).
-16. Read every **Plain-language** block as a reader with no codebase access: no code coordinates (line numbers, file paths, function/class names) in plain-language prose, no unglossed acronyms or tool names, concepts named in prose rather than raw identifiers, and every sentence passes the no-lookup test (see Write in Two Layers). Commit hashes and PR numbers cited as closure evidence are exempt — and encouraged: check that Applied / Eliminated / Retired entries carry one where identifiable.
+16. Read every **Plain-language** block — and all narrative prose outside element subsections (Intro, Details, UI, tables, appendix bullets) — as a reader with no codebase access: no code coordinates (line numbers, file paths, function/class names), no unglossed acronyms or tool names, concepts named in prose rather than raw identifiers, and every sentence passes the no-lookup test (see Write in Two Layers). Commit hashes and PR numbers cited as closure evidence are exempt — and encouraged: check that Applied / Eliminated / Retired entries carry one where identifiable.
 17. Confirm every Asset, Threat, and Countermeasure subsection has a **Plain-language** block — the mandatory layer is never missing.
 18. Confirm **no line numbers appear anywhere** in the document — including Technical-detail Anchors.
 19. Confirm every **Technical-detail block is additive**: none merely restates its plain-language claim in jargon. Delete any that does.
-20. Confirm every anchor in a Technical-detail block is **provenance-stamped** ("observed at `<commit>`", or the applying commit/PR for countermeasures).
+20. Confirm every Technical-detail block carries a **provenance stamp** covering all its anchors ("observed at `<commit>`", the applying commit/PR for countermeasures, or the fallback snapshot identifier when git history is unavailable) — with per-anchor stamps where observations span commits — and that Mechanism fields are phrased as observations at their stated provenance, not present-tense verdicts.
 21. Confirm the NOTICE preamble includes the **dual-use clause** and the three automated-reader instructions (confirm anchors resolve, verify from code, hunt beyond the listed items).
 22. Confirm Open Questions for the Team includes the **Coverage & Unknowns map**: examined vs. not-examined areas, and every "could not verify" claim from the body restated there.
 
